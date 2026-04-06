@@ -71,16 +71,15 @@ export default function DashboardClient({ initialProjects }: any) {
     return () => clearInterval(interval);
   }, [initialProjects, dismissedNotifs]);
 
-  // 2. MỚI: Tự động tắt Popup thông báo sau 30 giây
+  // 2. MỚI: Tự động tắt Popup thông báo sau 10 giây
   useEffect(() => {
     if (overdueProjects.length > 0) {
       const timer = setTimeout(() => {
         setDismissedNotifs((prev) => {
           const currentOverdueIds = overdueProjects.map(p => p.id);
-          // Gộp danh sách ẩn cũ và các dự án vừa hết 30s để ẩn đi
           return Array.from(new Set([...prev, ...currentOverdueIds]));
         });
-      }, 30000); // 30000ms = 30 giây
+      }, 10000);
       
       return () => clearTimeout(timer); 
     }
@@ -168,7 +167,6 @@ export default function DashboardClient({ initialProjects }: any) {
   return (
     <div className="space-y-6 relative">
       
-      {/* THÔNG BÁO QUÁ HẠN (SẼ TỰ TẮT SAU 30S) */}
       {overdueProjects.length > 0 && (
         <div className="fixed top-6 right-6 z-[60] w-80 space-y-3 pointer-events-none">
           {overdueProjects.map((p: any) => (
