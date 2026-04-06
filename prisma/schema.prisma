@@ -1,0 +1,63 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb" // ĐỔI SANG MONGODB
+  url      = env("DATABASE_URL")
+}
+
+model Project {
+  // Sửa lại ID theo chuẩn MongoDB
+  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  name             String   
+  code             String?  
+  totalLots        Int      
+  deadline         DateTime? 
+  
+  status           String   @default("ACTIVE") 
+
+  chuaBanHanhCount Int      @default(0)
+  chuaKiemKeCount  Int      @default(0)
+  xacNhanCount     Int      @default(0)
+  duThaoCount      Int      @default(0)
+  thamDinhCount    Int      @default(0)
+  pheDuyetCount    Int      @default(0)
+
+  projectStates    ProjectState[]
+  histories        ProjectHistory[] 
+  details          ProjectDetail?   
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model ProjectDetail {
+  id           String  @id @default(auto()) @map("_id") @db.ObjectId
+  tienDoDuAn   String? 
+  chiTiet      String? 
+  donViDoDac   String?
+  canBoGPMB    String?
+  mo           String?
+  ghiChu       String?
+
+  // Sửa lại khóa ngoại (Foreign key) thành ObjectId
+  projectId    String  @unique @db.ObjectId
+  project      Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model ProjectState {
+  id        String  @id @default(auto()) @map("_id") @db.ObjectId
+  name      String  
+  color     String? 
+  projectId String  @db.ObjectId
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model ProjectHistory {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  note      String   
+  projectId String   @db.ObjectId
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+}
