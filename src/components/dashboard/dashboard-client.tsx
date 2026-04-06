@@ -9,7 +9,7 @@ import {
   Building2, FileWarning, ClipboardList, Clock, 
   CheckCircle2, History, Plus, Info, Activity, 
   Edit3, Save, Calendar, AlertTriangle, BellRing, X,
-  LayoutGrid, List // MỚI: Icon cho nút chuyển đổi giao diện
+  LayoutGrid, List 
 } from "lucide-react";
 import { DASHBOARD_TEXT as T } from "@/src/constants/dashboard-text";
 
@@ -36,9 +36,7 @@ export default function DashboardClient({ initialProjects }: any) {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [activeFilter, setActiveFilter] = useState<'ALL' | 'CHUA_BAN_HANH' | 'CHUA_KIEM_KE' | 'DANG_GIAI_QUYET'>('ALL');
-
-  // MỚI: State quản lý chế độ xem (Lưới hoặc Bảng)
-  const [viewMode, setViewMode] = useState<'GRID' | 'LIST'>('LIST'); // Mặc định mở Dạng Bảng cho gọn
+  const [viewMode, setViewMode] = useState<'GRID' | 'LIST'>('LIST'); 
 
   const [formProgress, setFormProgress] = useState({
     chuaBanHanhCount: 0, chuaKiemKeCount: 0, xacNhanCount: 0, duThaoCount: 0, thamDinhCount: 0, pheDuyetCount: 0
@@ -54,6 +52,7 @@ export default function DashboardClient({ initialProjects }: any) {
   const [overdueProjects, setOverdueProjects] = useState<any[]>([]);
   const [dismissedNotifs, setDismissedNotifs] = useState<string[]>([]);
   
+  // 1. Quét dự án quá hạn (60s/lần)
   useEffect(() => {
     const scanDeadlines = () => {
       const now = new Date().getTime();
@@ -71,6 +70,21 @@ export default function DashboardClient({ initialProjects }: any) {
     const interval = setInterval(scanDeadlines, 60000); 
     return () => clearInterval(interval);
   }, [initialProjects, dismissedNotifs]);
+
+  // 2. MỚI: Tự động tắt Popup thông báo sau 30 giây
+  useEffect(() => {
+    if (overdueProjects.length > 0) {
+      const timer = setTimeout(() => {
+        setDismissedNotifs((prev) => {
+          const currentOverdueIds = overdueProjects.map(p => p.id);
+          // Gộp danh sách ẩn cũ và các dự án vừa hết 30s để ẩn đi
+          return Array.from(new Set([...prev, ...currentOverdueIds]));
+        });
+      }, 30000); // 30000ms = 30 giây
+      
+      return () => clearTimeout(timer); 
+    }
+  }, [overdueProjects]);
 
   const handleDismissNotif = (projectId: string) => setDismissedNotifs((prev) => [...prev, projectId]);
 
@@ -154,11 +168,11 @@ export default function DashboardClient({ initialProjects }: any) {
   return (
     <div className="space-y-6 relative">
       
-      {/* THÔNG BÁO QUÁ HẠN */}
+      {/* THÔNG BÁO QUÁ HẠN (SẼ TỰ TẮT SAU 30S) */}
       {overdueProjects.length > 0 && (
         <div className="fixed top-6 right-6 z-[60] w-80 space-y-3 pointer-events-none">
           {overdueProjects.map((p: any) => (
-            <div key={p.id} className="pointer-events-auto animate-in slide-in-from-right-full bg-white border-l-4 border-red-600 shadow-2xl p-4 pr-10 rounded-xl flex items-start gap-3 ring-1 ring-black/5 relative group">
+            <div key={p.id} className="pointer-events-auto animate-in slide-in-from-right-full fade-out duration-500 bg-white border-l-4 border-red-600 shadow-2xl p-4 pr-10 rounded-xl flex items-start gap-3 ring-1 ring-black/5 relative group">
               <button onClick={() => handleDismissNotif(p.id)} className="absolute top-3 right-3 p-1.5 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded-md transition-colors"><X className="w-4 h-4" /></button>
               <div className="bg-red-100 p-2 rounded-full animate-pulse shrink-0"><BellRing className="w-4 h-4 text-red-600" /></div>
               <div className="flex-1">
@@ -171,14 +185,13 @@ export default function DashboardClient({ initialProjects }: any) {
         </div>
       )}
 
-      {/* HEADER THU GỌN LẠI */}
+      {/* HEADER */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">{T.HEADER.TITLE}</h1>
           <p className="text-sm text-slate-500 mt-0.5">{T.HEADER.SUBTITLE}</p>
         </div>
         
-        {/* KHU VỰC CÔNG CỤ: TOGGLE VIEW & NÚT THÊM MỚI */}
         <div className="flex items-center gap-3 w-full md:w-auto">
           <div className="flex items-center bg-slate-200/60 p-1 rounded-lg">
             <button onClick={() => setViewMode('GRID')} title="Dạng Lưới" className={`p-1.5 rounded-md flex items-center justify-center transition-all ${viewMode === 'GRID' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-800'}`}>
@@ -205,12 +218,9 @@ export default function DashboardClient({ initialProjects }: any) {
 
       {sortedProjects.length === 0 && <div className="py-12 flex flex-col items-center justify-center text-slate-400 bg-slate-50 border-2 border-dashed rounded-xl"><FileWarning className="w-8 h-8 mb-2 opacity-50" /><p className="text-sm">{T.PROJECT_CARD.EMPTY_STATE}</p></div>}
 
-      {/* HIỂN THỊ DANH SÁCH DỰ ÁN DỰA VÀO TOGGLE */}
+      {/* DANH SÁCH DỰ ÁN (TƯỜNG MINH CHỮ, KHÔNG VIẾT TẮT) */}
       {sortedProjects.length > 0 && (
         viewMode === 'LIST' ? (
-          /* =========================================
-             GIAO DIỆN 1: DẠNG BẢNG (TABLE VIEW) 
-             ========================================= */
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm whitespace-nowrap">
@@ -220,9 +230,9 @@ export default function DashboardClient({ initialProjects }: any) {
                     <th className="px-4 py-3 font-bold">Trạng thái</th>
                     <th className="px-4 py-3 font-bold">Hạn chót</th>
                     <th className="px-4 py-3 font-bold w-48">Tiến độ</th>
-                    <th className="px-4 py-3 font-bold text-center">CBH</th>
-                    <th className="px-4 py-3 font-bold text-center">CKK</th>
-                    <th className="px-4 py-3 font-bold text-center">ĐGQ</th>
+                    <th className="px-4 py-3 font-bold text-center">{T.METRICS.CHUA_BAN_HANH}</th>
+                    <th className="px-4 py-3 font-bold text-center">{T.METRICS.CHUA_KIEM_KE}</th>
+                    <th className="px-4 py-3 font-bold text-center">{T.METRICS.DANG_GIAI_QUYET}</th>
                     <th className="px-4 py-3 font-bold text-right">Tổng lô</th>
                   </tr>
                 </thead>
@@ -260,9 +270,6 @@ export default function DashboardClient({ initialProjects }: any) {
             </div>
           </div>
         ) : (
-          /* =========================================
-             GIAO DIỆN 2: DẠNG LƯỚI THU GỌN (COMPACT GRID) 
-             ========================================= */
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 animate-in fade-in zoom-in-95 duration-200">
             {sortedProjects.map((project: any) => {
               const totalDangXuLy = project.xacNhanCount + project.duThaoCount + project.thamDinhCount + project.pheDuyetCount;
@@ -274,7 +281,6 @@ export default function DashboardClient({ initialProjects }: any) {
                 <Card key={project.id} className={`group hover:shadow-md transition-all duration-200 cursor-pointer overflow-hidden flex flex-col border border-slate-200 ${isCompleted ? 'bg-green-50/20' : isOverdue ? 'border-red-300 bg-red-50/30' : 'hover:border-blue-400'}`} onClick={() => handleOpenModal(project)}>
                   <div className={`h-1 w-full transition-opacity ${isCompleted ? 'bg-green-500 opacity-100' : isOverdue ? 'bg-red-500 opacity-100' : 'bg-gradient-to-r from-blue-400 to-indigo-500 opacity-0 group-hover:opacity-100'}`} />
                   
-                  {/* PADDING THU GỌN XUỐNG p-4 */}
                   <CardHeader className="p-4 pb-2">
                     <div className="flex justify-between items-start mb-1 gap-2">
                       <div className="overflow-hidden">
@@ -291,17 +297,26 @@ export default function DashboardClient({ initialProjects }: any) {
                     </div>
                   </CardHeader>
                   
-                  {/* BỎ CÁC BADGE THỪA MÀU SẮC DÀI DÒNG, TẬP TRUNG VÀO SỐ LIỆU GỐC */}
                   <CardContent className="p-4 pt-2 flex-1 flex flex-col justify-end">
-                    <div className="mb-3 space-y-1.5">
-                      <div className="flex justify-between text-[10px] font-bold text-slate-500 uppercase tracking-wider"><span>Tiến độ</span><span className="text-slate-700">{progressPercent}%</span></div>
+                    <div className="mb-4 space-y-1.5">
+                      <div className="flex justify-between text-[10px] font-bold text-slate-500 uppercase tracking-wider"><span>{T.PROJECT_CARD.PROGRESS_TITLE}</span><span className="text-slate-700">{progressPercent}%</span></div>
                       <Progress value={progressPercent} className={`h-1.5 ${isCompleted ? 'bg-green-200' : isOverdue ? 'bg-red-200' : ''}`} />
                     </div>
-                    {/* BẢNG TÓM TẮT SỐ LÔ SIÊU GỌN */}
-                    <div className="grid grid-cols-3 gap-1 bg-slate-50 rounded-lg p-2 border border-slate-100">
-                      <div className="flex flex-col items-center"><span className="text-[9px] text-slate-400 uppercase font-bold mb-0.5">CBH</span><span className="text-sm font-bold text-slate-700">{project.chuaBanHanhCount}</span></div>
-                      <div className="flex flex-col items-center border-l border-slate-200"><span className="text-[9px] text-slate-400 uppercase font-bold mb-0.5">CKK</span><span className="text-sm font-bold text-blue-600">{project.chuaKiemKeCount}</span></div>
-                      <div className="flex flex-col items-center border-l border-slate-200"><span className="text-[9px] text-slate-400 uppercase font-bold mb-0.5">ĐGQ</span><span className="text-sm font-bold text-orange-600">{totalDangXuLy}</span></div>
+                    
+                    {/* BẢNG TÓM TẮT DẠNG CỘT DỌC (TƯỜNG MINH CHỮ) */}
+                    <div className="flex flex-col gap-1.5 bg-slate-50 rounded-lg p-3 border border-slate-100">
+                      <div className="flex justify-between items-center">
+                        <span className="text-[10px] text-slate-500 font-bold uppercase">{T.METRICS.CHUA_BAN_HANH}</span>
+                        <span className="text-sm font-bold text-slate-700">{project.chuaBanHanhCount}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-[10px] text-slate-500 font-bold uppercase">{T.METRICS.CHUA_KIEM_KE}</span>
+                        <span className="text-sm font-bold text-blue-600">{project.chuaKiemKeCount}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-[10px] text-slate-500 font-bold uppercase">{T.METRICS.DANG_GIAI_QUYET}</span>
+                        <span className="text-sm font-bold text-orange-600">{totalDangXuLy}</span>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
