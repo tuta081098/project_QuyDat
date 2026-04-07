@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -9,8 +9,9 @@ import {
   Building2, FileWarning, ClipboardList, Clock, 
   CheckCircle2, History, Plus, Info, Activity, 
   Edit3, Save, Calendar, AlertTriangle, BellRing, X,
-  LayoutGrid, List 
+  LayoutGrid, List, FileSpreadsheet
 } from "lucide-react";
+import * as XLSX from "xlsx";
 import { DASHBOARD_TEXT as T } from "@/src/constants/dashboard-text";
 
 const OPTION_TIENDO = ["Đấu giá", "HTKT", "Trường", "Đường", "Ngoài ngân sách", "Trung ương"];
@@ -19,11 +20,12 @@ const OPTION_CHITIET = ["Chưa nhận mốc", "Đã nhận mốc", "Chưa có m�
 const inputStyles = "w-full p-2.5 border border-slate-300 rounded-lg bg-white text-slate-900 font-semibold focus:ring-2 focus:ring-blue-500 outline-none shadow-sm transition-all";
 const numberInputStyles = "w-full p-2.5 border border-slate-300 rounded-lg bg-white text-slate-900 font-bold text-lg focus:ring-2 focus:ring-orange-500 outline-none shadow-sm transition-all";
 
+// Hàm hỗ trợ format date ép theo chuẩn Giờ Việt Nam (GMT+7)
 const formatForInput = (dateStr: string) => {
   if (!dateStr) return "";
   const d = new Date(dateStr);
-  const pad = (n: number) => n.toString().padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  const vnTime = new Date(d.getTime() + (7 * 60 * 60 * 1000)); 
+  return vnTime.toISOString().slice(0, 16);
 };
 
 export default function DashboardClient({ initialProjects }: any) {
@@ -37,6 +39,9 @@ export default function DashboardClient({ initialProjects }: any) {
   const [isLoading, setIsLoading] = useState(false);
   const [activeFilter, setActiveFilter] = useState<'ALL' | 'CHUA_BAN_HANH' | 'CHUA_KIEM_KE' | 'DANG_GIAI_QUYET'>('ALL');
   const [viewMode, setViewMode] = useState<'GRID' | 'LIST'>('LIST'); 
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isImporting, setIsImporting] = useState(false);
 
   const [formProgress, setFormProgress] = useState({
     chuaBanHanhCount: 0, chuaKiemKeCount: 0, xacNhanCount: 0, duThaoCount: 0, thamDinhCount: 0, pheDuyetCount: 0
@@ -71,7 +76,7 @@ export default function DashboardClient({ initialProjects }: any) {
     return () => clearInterval(interval);
   }, [initialProjects, dismissedNotifs]);
 
-  // 2. MỚI: Tự động tắt Popup thông báo sau 10 giây
+  // 2. Tự động ẩn popup thông báo quá hạn sau 6 GIÂY
   useEffect(() => {
     if (overdueProjects.length > 0) {
       const timer = setTimeout(() => {
@@ -79,7 +84,7 @@ export default function DashboardClient({ initialProjects }: any) {
           const currentOverdueIds = overdueProjects.map(p => p.id);
           return Array.from(new Set([...prev, ...currentOverdueIds]));
         });
-      }, 10000);
+      }, 6000); // 6 giây
       
       return () => clearTimeout(timer); 
     }
@@ -97,6 +102,7 @@ export default function DashboardClient({ initialProjects }: any) {
     return true;
   });
 
+  // Thuật toán sắp xếp thông minh
   const sortedProjects = [...filteredProjects].sort((a: any, b: any) => {
     const now = new Date().getTime();
     const isOverdueA = a.deadline && new Date(a.deadline).getTime() < now && a.status !== "COMPLETED";
@@ -110,6 +116,47 @@ export default function DashboardClient({ initialProjects }: any) {
   const totalChuaBanHanh = initialProjects.reduce((sum: number, p: any) => sum + (p.chuaBanHanhCount || 0), 0);
   const totalChuaKiemKe = initialProjects.reduce((sum: number, p: any) => sum + (p.chuaKiemKeCount || 0), 0);
   const totalDangGiaiQuyet = initialProjects.reduce((sum: number, p: any) => sum + (p.xacNhanCount || 0) + (p.duThaoCount || 0) + (p.thamDinhCount || 0) + (p.pheDuyetCount || 0), 0);
+
+  // Xử lý Import Excel
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsImporting(true);
+    try {
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data, { type: "array" });
+      const firstSheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[firstSheetName];
+      const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+      if (jsonData.length === 0) {
+        alert("File Excel trống!");
+        setIsImporting(false);
+        return;
+      }
+
+      const res = await fetch('/api/projects/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(jsonData)
+      });
+
+      if (res.ok) {
+        const result = await res.json();
+        alert(`Đã import thành công ${result.count} dự án!`);
+        router.refresh(); 
+      } else {
+        alert("Có lỗi xảy ra khi lưu vào Database.");
+      }
+    } catch (error) {
+      console.error("Lỗi đọc file:", error);
+      alert("Không thể đọc file Excel này. Vui lòng kiểm tra định dạng.");
+    } finally {
+      setIsImporting(false);
+      if (fileInputRef.current) fileInputRef.current.value = ''; 
+    }
+  };
 
   const handleOpenModal = (project: any) => {
     const freshProject = initialProjects.find((p: any) => p.id === project.id) || project;
@@ -167,6 +214,7 @@ export default function DashboardClient({ initialProjects }: any) {
   return (
     <div className="space-y-6 relative">
       
+      {/* THÔNG BÁO QUÁ HẠN TỰ TẮT SAU 6 GIÂY */}
       {overdueProjects.length > 0 && (
         <div className="fixed top-6 right-6 z-[60] w-80 space-y-3 pointer-events-none">
           {overdueProjects.map((p: any) => (
@@ -176,14 +224,17 @@ export default function DashboardClient({ initialProjects }: any) {
               <div className="flex-1">
                 <h4 className="text-sm font-bold text-slate-900 line-clamp-1">{p.name}</h4>
                 <p className="text-xs text-red-600 font-bold mt-0.5">{T.NOTIFICATIONS.OVERDUE_TITLE}</p>
-                <div className="flex items-center gap-1 text-[10px] text-slate-500 mt-1"><Clock className="w-3 h-3" /><span>{T.NOTIFICATIONS.DEADLINE_LABEL} {new Date(p.deadline).toLocaleString('vi-VN', {hour: '2-digit', minute:'2-digit', day: '2-digit', month: '2-digit', year: 'numeric'})}</span></div>
+                <div className="flex items-center gap-1 text-[10px] text-slate-500 mt-1">
+                  <Clock className="w-3 h-3" />
+                  <span>{T.NOTIFICATIONS.DEADLINE_LABEL} {new Date(p.deadline).toLocaleString('vi-VN', {timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', minute:'2-digit', day: '2-digit', month: '2-digit', year: 'numeric'})}</span>
+                </div>
               </div>
             </div>
           ))}
         </div>
       )}
 
-      {/* HEADER */}
+      {/* HEADER & CÔNG CỤ */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">{T.HEADER.TITLE}</h1>
@@ -191,22 +242,26 @@ export default function DashboardClient({ initialProjects }: any) {
         </div>
         
         <div className="flex items-center gap-3 w-full md:w-auto">
+          {/* Nút Layout Toggle */}
           <div className="flex items-center bg-slate-200/60 p-1 rounded-lg">
-            <button onClick={() => setViewMode('GRID')} title="Dạng Lưới" className={`p-1.5 rounded-md flex items-center justify-center transition-all ${viewMode === 'GRID' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-800'}`}>
-              <LayoutGrid className="w-4 h-4" />
-            </button>
-            <button onClick={() => setViewMode('LIST')} title="Dạng Bảng" className={`p-1.5 rounded-md flex items-center justify-center transition-all ${viewMode === 'LIST' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-800'}`}>
-              <List className="w-4 h-4" />
-            </button>
+            <button onClick={() => setViewMode('GRID')} title="Dạng Lưới" className={`p-1.5 rounded-md flex items-center justify-center transition-all ${viewMode === 'GRID' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-800'}`}><LayoutGrid className="w-4 h-4" /></button>
+            <button onClick={() => setViewMode('LIST')} title="Dạng Bảng" className={`p-1.5 rounded-md flex items-center justify-center transition-all ${viewMode === 'LIST' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-800'}`}><List className="w-4 h-4" /></button>
           </div>
 
+          {/* Import Excel */}
+          <input type="file" accept=".xlsx, .xls" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
+          <button onClick={() => fileInputRef.current?.click()} disabled={isImporting} className="flex-1 md:flex-none flex justify-center items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold transition-all shadow-md text-sm disabled:opacity-50">
+            <FileSpreadsheet className="w-4 h-4" /> {isImporting ? 'Đang tải...' : 'Nhập Excel'}
+          </button>
+
+          {/* Thêm mới */}
           <button onClick={() => { setFormDetails({...defaultDetails, deadline: ""}); setIsCreateModalOpen(true); }} className="flex-1 md:flex-none flex justify-center items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-all shadow-md text-sm">
             <Plus className="w-4 h-4" /> {T.HEADER.BTN_ADD_NEW}
           </button>
         </div>
       </div>
 
-      {/* METRICS CARDS */}
+      {/* THẺ METRICS */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card onClick={() => setActiveFilter('ALL')} className={`cursor-pointer transition-all hover:shadow-md border-0 shadow-sm ${activeFilter === 'ALL' ? 'ring-2 ring-slate-800/30' : ''} bg-gradient-to-br from-slate-800 to-slate-900 text-white`}><CardHeader className="p-4 pb-1 flex flex-row items-center justify-between"><CardTitle className="text-xs font-medium opacity-80">{T.METRICS.TOTAL_PROJECTS}</CardTitle><Building2 className="h-4 w-4 opacity-70" /></CardHeader><CardContent className="p-4 pt-0"><div className="text-2xl font-bold">{totalProjects}</div></CardContent></Card>
         <Card onClick={() => setActiveFilter('CHUA_BAN_HANH')} className={`cursor-pointer transition-all hover:shadow-md shadow-sm ${activeFilter === 'CHUA_BAN_HANH' ? 'ring-2 ring-slate-400 bg-slate-50' : ''}`}><CardHeader className="p-4 pb-1 flex flex-row items-center justify-between"><CardTitle className="text-xs font-medium text-slate-500">{T.METRICS.CHUA_BAN_HANH}</CardTitle><FileWarning className="h-4 w-4 text-slate-400" /></CardHeader><CardContent className="p-4 pt-0"><div className="text-2xl font-bold text-slate-700">{totalChuaBanHanh}</div></CardContent></Card>
@@ -216,9 +271,10 @@ export default function DashboardClient({ initialProjects }: any) {
 
       {sortedProjects.length === 0 && <div className="py-12 flex flex-col items-center justify-center text-slate-400 bg-slate-50 border-2 border-dashed rounded-xl"><FileWarning className="w-8 h-8 mb-2 opacity-50" /><p className="text-sm">{T.PROJECT_CARD.EMPTY_STATE}</p></div>}
 
-      {/* DANH SÁCH DỰ ÁN (TƯỜNG MINH CHỮ, KHÔNG VIẾT TẮT) */}
+      {/* DANH SÁCH DỰ ÁN */}
       {sortedProjects.length > 0 && (
         viewMode === 'LIST' ? (
+          // DẠNG BẢNG (TABLE)
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm whitespace-nowrap">
@@ -248,7 +304,7 @@ export default function DashboardClient({ initialProjects }: any) {
                           {isCompleted ? <Badge className="bg-green-100 text-green-700 font-bold border-0 hover:bg-green-100">{T.PROJECT_CARD.COMPLETED}</Badge> : isOverdue ? <Badge className="bg-red-500 text-white font-bold border-0 animate-pulse hover:bg-red-500">{T.PROJECT_CARD.OVERDUE_BADGE}</Badge> : <Badge variant="outline" className="text-slate-500 font-bold bg-white">Đang xử lý</Badge>}
                         </td>
                         <td className={`px-4 py-3.5 font-semibold text-xs ${isOverdue ? 'text-red-600' : 'text-slate-500'}`}>
-                          {project.deadline ? new Date(project.deadline).toLocaleDateString('vi-VN') : '---'}
+                          {project.deadline ? new Date(project.deadline).toLocaleDateString('vi-VN', {timeZone: 'Asia/Ho_Chi_Minh'}) : '---'}
                         </td>
                         <td className="px-4 py-3.5">
                           <div className="flex items-center gap-2">
@@ -268,6 +324,7 @@ export default function DashboardClient({ initialProjects }: any) {
             </div>
           </div>
         ) : (
+          // DẠNG LƯỚI (GRID)
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 animate-in fade-in zoom-in-95 duration-200">
             {sortedProjects.map((project: any) => {
               const totalDangXuLy = project.xacNhanCount + project.duThaoCount + project.thamDinhCount + project.pheDuyetCount;
@@ -286,7 +343,7 @@ export default function DashboardClient({ initialProjects }: any) {
                         <div className="flex items-center gap-1.5 mt-1">
                           <Calendar className={`w-3 h-3 shrink-0 ${isOverdue ? 'text-red-600' : 'text-slate-400'}`} />
                           <span className={`text-[10px] font-bold truncate ${isOverdue ? 'text-red-600' : 'text-slate-500'}`}>
-                            {project.deadline ? new Date(project.deadline).toLocaleDateString('vi-VN') : T.PROJECT_CARD.NO_DEADLINE}
+                            {project.deadline ? new Date(project.deadline).toLocaleDateString('vi-VN', {timeZone: 'Asia/Ho_Chi_Minh'}) : T.PROJECT_CARD.NO_DEADLINE}
                           </span>
                         </div>
                       </div>
@@ -301,20 +358,10 @@ export default function DashboardClient({ initialProjects }: any) {
                       <Progress value={progressPercent} className={`h-1.5 ${isCompleted ? 'bg-green-200' : isOverdue ? 'bg-red-200' : ''}`} />
                     </div>
                     
-                    {/* BẢNG TÓM TẮT DẠNG CỘT DỌC (TƯỜNG MINH CHỮ) */}
                     <div className="flex flex-col gap-1.5 bg-slate-50 rounded-lg p-3 border border-slate-100">
-                      <div className="flex justify-between items-center">
-                        <span className="text-[10px] text-slate-500 font-bold uppercase">{T.METRICS.CHUA_BAN_HANH}</span>
-                        <span className="text-sm font-bold text-slate-700">{project.chuaBanHanhCount}</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-[10px] text-slate-500 font-bold uppercase">{T.METRICS.CHUA_KIEM_KE}</span>
-                        <span className="text-sm font-bold text-blue-600">{project.chuaKiemKeCount}</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-[10px] text-slate-500 font-bold uppercase">{T.METRICS.DANG_GIAI_QUYET}</span>
-                        <span className="text-sm font-bold text-orange-600">{totalDangXuLy}</span>
-                      </div>
+                      <div className="flex justify-between items-center"><span className="text-[10px] text-slate-500 font-bold uppercase">{T.METRICS.CHUA_BAN_HANH}</span><span className="text-sm font-bold text-slate-700">{project.chuaBanHanhCount}</span></div>
+                      <div className="flex justify-between items-center"><span className="text-[10px] text-slate-500 font-bold uppercase">{T.METRICS.CHUA_KIEM_KE}</span><span className="text-sm font-bold text-blue-600">{project.chuaKiemKeCount}</span></div>
+                      <div className="flex justify-between items-center"><span className="text-[10px] text-slate-500 font-bold uppercase">{T.METRICS.DANG_GIAI_QUYET}</span><span className="text-sm font-bold text-orange-600">{totalDangXuLy}</span></div>
                     </div>
                   </CardContent>
                 </Card>
@@ -414,7 +461,7 @@ export default function DashboardClient({ initialProjects }: any) {
                     selectedProject.histories.map((hist: any) => (
                       <div key={hist.id} className="relative flex items-start justify-between bg-white p-4 rounded-xl border border-slate-200 shadow-sm z-10 text-sm ml-8 transition-all hover:shadow-md hover:border-slate-300">
                         <div className="absolute w-3.5 h-3.5 bg-slate-400 rounded-full -left-[1.5rem] top-5 ring-4 ring-white"></div>
-                        <div className="flex flex-col gap-2 w-full"><span className="text-xs font-bold text-slate-400 uppercase tracking-wider">{new Date(hist.createdAt).toLocaleString('vi-VN')}</span><div className="text-slate-800 leading-relaxed font-medium">{hist.note.split(' | ').map((line: string, i: number) => (<div key={i} className="mb-1">• {line}</div>))}</div></div>
+                        <div className="flex flex-col gap-2 w-full"><span className="text-xs font-bold text-slate-400 uppercase tracking-wider">{new Date(hist.createdAt).toLocaleString('vi-VN', {timeZone: 'Asia/Ho_Chi_Minh'})}</span><div className="text-slate-800 leading-relaxed font-medium">{hist.note.split(' | ').map((line: string, i: number) => (<div key={i} className="mb-1">• {line}</div>))}</div></div>
                       </div>
                     ))
                   ) : <p className="text-sm text-slate-400 italic text-center py-10 font-medium">{T.HISTORY.EMPTY}</p>}
