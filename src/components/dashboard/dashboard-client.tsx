@@ -274,7 +274,9 @@ export default function DashboardClient({ initialProjects }: any) {
       {/* DANH SÁCH DỰ ÁN */}
       {sortedProjects.length > 0 && (
         viewMode === 'LIST' ? (
+          // =========================================
           // DẠNG BẢNG (TABLE)
+          // =========================================
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm whitespace-nowrap">
@@ -299,7 +301,17 @@ export default function DashboardClient({ initialProjects }: any) {
 
                     return (
                       <tr key={project.id} onClick={() => handleOpenModal(project)} className={`cursor-pointer transition-colors hover:bg-slate-50 ${isOverdue ? 'bg-red-50/40' : ''}`}>
-                        <td className="px-4 py-3.5 font-bold text-slate-800 max-w-[250px] truncate" title={project.name}>{project.name}</td>
+                        
+                        {/* THÊM TOOLTIP CHO BẢNG MÀ KHÔNG BỊ TRÀN CHỮ */}
+                        <td className="px-4 py-3.5 font-bold text-slate-800 max-w-[250px] relative group/tooltip">
+                          <div className="truncate cursor-help">{project.name}</div>
+                          {/* Tooltip Nổi */}
+                          <div className="absolute left-4 bottom-full mb-1 hidden group-hover/tooltip:block z-[100] bg-slate-900 text-white text-xs font-medium px-3 py-2 rounded-lg shadow-xl w-max max-w-[300px] whitespace-normal break-words pointer-events-none leading-relaxed">
+                            {project.name}
+                            <div className="absolute top-full left-4 -mt-1 border-4 border-transparent border-t-slate-900"></div>
+                          </div>
+                        </td>
+
                         <td className="px-4 py-3.5">
                           {isCompleted ? <Badge className="bg-green-100 text-green-700 font-bold border-0 hover:bg-green-100">{T.PROJECT_CARD.COMPLETED}</Badge> : isOverdue ? <Badge className="bg-red-500 text-white font-bold border-0 animate-pulse hover:bg-red-500">{T.PROJECT_CARD.OVERDUE_BADGE}</Badge> : <Badge variant="outline" className="text-slate-500 font-bold bg-white">Đang xử lý</Badge>}
                         </td>
@@ -324,7 +336,9 @@ export default function DashboardClient({ initialProjects }: any) {
             </div>
           </div>
         ) : (
+          // =========================================
           // DẠNG LƯỚI (GRID)
+          // =========================================
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 animate-in fade-in zoom-in-95 duration-200">
             {sortedProjects.map((project: any) => {
               const totalDangXuLy = project.xacNhanCount + project.duThaoCount + project.thamDinhCount + project.pheDuyetCount;
@@ -333,13 +347,21 @@ export default function DashboardClient({ initialProjects }: any) {
               const isOverdue = project.deadline && new Date(project.deadline).getTime() < new Date().getTime() && !isCompleted;
 
               return (
-                <Card key={project.id} className={`group hover:shadow-md transition-all duration-200 cursor-pointer overflow-hidden flex flex-col border border-slate-200 ${isCompleted ? 'bg-green-50/20' : isOverdue ? 'border-red-300 bg-red-50/30' : 'hover:border-blue-400'}`} onClick={() => handleOpenModal(project)}>
-                  <div className={`h-1 w-full transition-opacity ${isCompleted ? 'bg-green-500 opacity-100' : isOverdue ? 'bg-red-500 opacity-100' : 'bg-gradient-to-r from-blue-400 to-indigo-500 opacity-0 group-hover:opacity-100'}`} />
+                <Card key={project.id} className={`group hover:shadow-md transition-all duration-200 cursor-pointer flex flex-col rounded-xl border border-slate-200 ${isCompleted ? 'bg-green-50/20' : isOverdue ? 'border-red-300 bg-red-50/30' : 'hover:border-blue-400'}`} onClick={() => handleOpenModal(project)}>
+                  <div className={`h-1.5 w-full rounded-t-xl transition-opacity ${isCompleted ? 'bg-green-500 opacity-100' : isOverdue ? 'bg-red-500 opacity-100' : 'bg-gradient-to-r from-blue-400 to-indigo-500 opacity-0 group-hover:opacity-100'}`} />
                   
                   <CardHeader className="p-4 pb-2">
                     <div className="flex justify-between items-start mb-1 gap-2">
-                      <div className="overflow-hidden">
-                        <CardTitle className="text-sm text-slate-800 font-bold truncate" title={project.name}>{project.name}</CardTitle>
+                      
+                      {/* THÊM TOOLTIP CHO GRID MÀ KHÔNG BỊ TRÀN CHỮ */}
+                      <div className="min-w-0 flex-1 relative group/tooltip">
+                        <CardTitle className="text-sm text-slate-800 font-bold truncate cursor-help">{project.name}</CardTitle>
+                        {/* Tooltip Nổi */}
+                        <div className="absolute left-0 bottom-full mb-2 hidden group-hover/tooltip:block z-[100] bg-slate-900 text-white text-xs font-medium px-3 py-2 rounded-lg shadow-xl w-max max-w-[250px] whitespace-normal break-words pointer-events-none leading-relaxed">
+                          {project.name}
+                          <div className="absolute top-full left-4 -mt-1 border-4 border-transparent border-t-slate-900"></div>
+                        </div>
+
                         <div className="flex items-center gap-1.5 mt-1">
                           <Calendar className={`w-3 h-3 shrink-0 ${isOverdue ? 'text-red-600' : 'text-slate-400'}`} />
                           <span className={`text-[10px] font-bold truncate ${isOverdue ? 'text-red-600' : 'text-slate-500'}`}>
@@ -347,6 +369,7 @@ export default function DashboardClient({ initialProjects }: any) {
                           </span>
                         </div>
                       </div>
+
                       {isCompleted && <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0" />}
                       {isOverdue && <AlertTriangle className="w-4 h-4 text-red-500 shrink-0 animate-bounce" />}
                     </div>
