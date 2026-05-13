@@ -1,11 +1,11 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+// SỬA LẠI ĐƯỜNG DẪN IMPORT ACTION TẠI ĐÂY
 import { FileText, Upload, X, Send, LockKeyhole, User } from "lucide-react";
-import { verifyLogin } from "@/src/app/gen-van-ban/action";
+import { verifyLogin } from "@/src/app/tao-van-ban/action";
 
-export default function GenVanBanClient() {
-  // State cho Đăng nhập
+export default function TaoVanBanClient() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isChecking, setIsChecking] = useState(true);
   const [username, setUsername] = useState("");
@@ -13,14 +13,12 @@ export default function GenVanBanClient() {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  // State cho Màn hình chính
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Kiểm tra xem đã đăng nhập từ trước chưa (chỉ lưu trong phiên làm việc hiện tại)
   useEffect(() => {
-    const session = sessionStorage.getItem("auth_gen_van_ban");
+    const session = sessionStorage.getItem("auth_tao_van_ban");
     if (session === "true") {
       setIsLoggedIn(true);
     }
@@ -32,11 +30,10 @@ export default function GenVanBanClient() {
     setIsLoading(true);
     setError("");
 
-    // Gọi hàm kiểm tra trên Server (Không lộ password F12)
     const res = await verifyLogin(username, password);
     
     if (res.success) {
-      sessionStorage.setItem("auth_gen_van_ban", "true");
+      sessionStorage.setItem("auth_tao_van_ban", "true");
       setIsLoggedIn(true);
     } else {
       setError(res.message || 'Lỗi');
@@ -45,14 +42,13 @@ export default function GenVanBanClient() {
   };
 
   const handleLogout = () => {
-    sessionStorage.removeItem("auth_gen_van_ban");
+    sessionStorage.removeItem("auth_tao_van_ban");
     setIsLoggedIn(false);
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Xác thực đuôi file ngay trên client
       if (file.name.endsWith('.doc') || file.name.endsWith('.docx')) {
         setSelectedFile(file);
       } else {
@@ -62,11 +58,8 @@ export default function GenVanBanClient() {
     }
   };
 
-  if (isChecking) return null; // Tránh nháy giao diện khi mới load
+  if (isChecking) return null;
 
-  // ==========================================
-  // MÀN HÌNH 1: ĐĂNG NHẬP
-  // ==========================================
   if (!isLoggedIn) {
     return (
       <div className="min-h-[80vh] flex items-center justify-center">
@@ -106,9 +99,6 @@ export default function GenVanBanClient() {
     );
   }
 
-  // ==========================================
-  // MÀN HÌNH 2: TRANG CHỦ SAU KHI ĐĂNG NHẬP
-  // ==========================================
   return (
     <div className="space-y-6 max-w-5xl mx-auto animate-in fade-in duration-500">
       
@@ -137,13 +127,11 @@ export default function GenVanBanClient() {
         <p className="text-slate-500 max-w-md mb-6">Bạn cần chuẩn bị sẵn file mẫu định dạng Word (.docx) trước khi thực hiện kết xuất hàng loạt.</p>
         
         <button className="flex items-center gap-2 px-8 py-3.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-bold transition-all shadow-lg shadow-emerald-200 hover:-translate-y-0.5">
-          <Send className="w-5 h-5" /> Đẩy dữ liệu
+          <Send className="w-5 h-5" /> Gán dữ liệu vào mẫu
         </button>
       </div>
 
-      {/* ========================================== */}
-      {/* POPUP: UPLOAD FILE MẪU */}
-      {/* ========================================== */}
+      {/* POPUP UPLOAD */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
@@ -161,7 +149,6 @@ export default function GenVanBanClient() {
                 <p className="text-sm font-bold text-slate-700 mb-1">Click để chọn file từ máy tính</p>
                 <p className="text-xs text-slate-500 font-medium">Chỉ hỗ trợ file Word (.doc, .docx)</p>
                 
-                {/* Chỉ lấy file Word */}
                 <input 
                   type="file" 
                   ref={fileInputRef} 
