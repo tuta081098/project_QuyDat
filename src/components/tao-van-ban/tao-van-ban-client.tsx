@@ -12,7 +12,6 @@ import JSZip from "jszip";
 import { saveAs } from "file-saver";
 import { verifyLogin } from "@/src/app/tao-van-ban/action";
 
-// Interface định nghĩa cấu trúc dữ liệu của 1 Mẫu văn bản
 interface TemplateItem {
   id: string;
   name: string;
@@ -21,19 +20,67 @@ interface TemplateItem {
   createdAt: Date;
 }
 
+// =========================================
+// HỆ QUẢN TRỊ CSDL CỤC BỘ (INDEXED-DB)
+// Giúp lưu file Word vượt qua việc F5 làm mới trang
+// =========================================
+const initDB = (): Promise<IDBDatabase> => {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open("DocGenDB", 1);
+    request.onupgradeneeded = (e: any) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains("templates")) {
+        db.createObjectStore("templates", { keyPath: "id" });
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+};
+
+const saveTemplateToDB = async (template: TemplateItem) => {
+  const db = await initDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction("templates", "readwrite");
+    tx.objectStore("templates").put(template);
+    tx.oncomplete = () => resolve(true);
+    tx.onerror = () => reject(tx.error);
+  });
+};
+
+const getTemplatesFromDB = async (): Promise<TemplateItem[]> => {
+  const db = await initDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction("templates", "readonly");
+    const req = tx.objectStore("templates").getAll();
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+};
+
+const deleteTemplateFromDB = async (id: string) => {
+  const db = await initDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction("templates", "readwrite");
+    tx.objectStore("templates").delete(id);
+    tx.oncomplete = () => resolve(true);
+    tx.onerror = () => reject(tx.error);
+  });
+};
+
+// =========================================
+// COMPONENT CHÍNH
+// =========================================
 export default function TaoVanBanClient() {
-  // === STATE ĐĂNG NHẬP ===
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isChecking, setIsChecking] = useState(true);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
-  // === STATE QUẢN LÝ MẪU (BẢNG) ===
   const [templates, setTemplates] = useState<TemplateItem[]>([]);
   const wordInputRef = useRef<HTMLInputElement>(null);
 
-  // === STATE SỬ DỤNG MẪU (MODAL) ===
   const [activeTemplate, setActiveTemplate] = useState<TemplateItem | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [excelFile, setExcelFile] = useState<File | null>(null);
@@ -41,11 +88,17 @@ export default function TaoVanBanClient() {
   const [isGenerating, setIsGenerating] = useState(false);
   const excelInputRef = useRef<HTMLInputElement>(null);
 
-  // Kiểm tra trạng thái đăng nhập
+  // KHI TRANG LOAD LÊN: Kiểm tra Login & Lấy dữ liệu mẫu từ DB cục bộ
   useEffect(() => {
     const session = sessionStorage.getItem("auth_tao_van_ban");
     if (session === "true") setIsLoggedIn(true);
     setIsChecking(false);
+
+    // Tự động load danh sách mẫu ngay cả khi vừa bấm F5
+    getTemplatesFromDB().then((data) => {
+      const sorted = data.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      setTemplates(sorted);
+    }).catch(err => console.error("Lỗi load Database cục bộ:", err));
   }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -61,15 +114,12 @@ export default function TaoVanBanClient() {
   const handleLogout = () => {
     sessionStorage.removeItem("auth_tao_van_ban");
     setIsLoggedIn(false);
-    setTemplates([]);
   };
 
-  // =========================================
-  // BƯỚC 1: TẢI LÊN FILE WORD VÀ LƯU VÀO BẢNG
-  // =========================================
+  // TẢI LÊN FILE WORD VÀ LƯU VÀO DB CỤC BỘ
   const handleWordSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (wordInputRef.current) wordInputRef.current.value = ''; // Reset input
+    if (wordInputRef.current) wordInputRef.current.value = ''; 
 
     if (file && file.name.endsWith('.docx')) {
       try {
@@ -94,15 +144,17 @@ export default function TaoVanBanClient() {
           createdAt: new Date()
         };
 
-        // Thêm vào danh sách bảng
+        // Lưu vào IndexedDB để chống F5
+        await saveTemplateToDB(newTemplate);
+        
+        // Cập nhật giao diện
         setTemplates(prev => [newTemplate, ...prev]);
 
         if (extractedKeys.size === 0) {
-          alert(`File "${file.name}" đã được tải lên, nhưng không tìm thấy từ khóa {key} nào bên trong.`);
+          alert(`File "${file.name}" đã được tải lên, nhưng không tìm thấy từ khóa {key} nào.`);
         }
 
       } catch (err) {
-        console.error(err);
         alert("File Word bị lỗi hoặc không thể đọc. Vui lòng kiểm tra lại định dạng.");
       }
     } else if (file) {
@@ -110,9 +162,6 @@ export default function TaoVanBanClient() {
     }
   };
 
-  // =========================================
-  // BƯỚC 2: TẢI XUỐNG FILE EXCEL MẪU TỪ BẢNG
-  // =========================================
   const downloadExcelTemplate = (template: TemplateItem) => {
     if (template.keys.length === 0) {
       alert("Mẫu này không có từ khóa nào để tạo file Excel.");
@@ -129,19 +178,16 @@ export default function TaoVanBanClient() {
     const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
     const dataBlob = new Blob([excelBuffer], {type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
     
-    const cleanName = template.name.replace('.docx', '');
-    saveAs(dataBlob, `Data_Mau_${cleanName}.xlsx`);
+    saveAs(dataBlob, `Data_Mau_${template.name.replace('.docx', '')}.xlsx`);
   };
 
-  const removeTemplate = (id: string) => {
+  const removeTemplate = async (id: string) => {
     if(confirm("Bạn có chắc muốn xóa mẫu này khỏi danh sách?")) {
+      await deleteTemplateFromDB(id); // Xóa khỏi CSDL cục bộ
       setTemplates(templates.filter(t => t.id !== id));
     }
   };
 
-  // =========================================
-  // BƯỚC 3: MỞ MODAL SỬ DỤNG MẪU VÀ TẢI EXCEL DATA
-  // =========================================
   const openUseModal = (template: TemplateItem) => {
     setActiveTemplate(template);
     setExcelFile(null);
@@ -166,14 +212,9 @@ export default function TaoVanBanClient() {
         setExcelFile(null);
         setExcelData([]);
       }
-    } else if (file) {
-      alert("Chỉ hỗ trợ file dữ liệu Excel (.xlsx, .xls)");
     }
   };
 
-  // =========================================
-  // BƯỚC 4: THUẬT TOÁN KẾT XUẤT VÀ LƯU LỊCH SỬ
-  // =========================================
   const fileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -209,6 +250,7 @@ export default function TaoVanBanClient() {
       const zipBlob = await zipOutput.generateAsync({ type: "blob" });
       saveAs(zipBlob, `Ket_Xuat_${activeTemplate.name.replace('.docx', '')}_${new Date().getTime()}.zip`);
       
+      // Chạy ngầm API lưu Lịch sử (nếu có Server)
       try {
         const base64String = await fileToBase64(activeTemplate.file);
         await fetch('/api/tao-van-ban', {
@@ -224,7 +266,7 @@ export default function TaoVanBanClient() {
       } catch (dbError) {}
 
       alert(`🎉 Đã kết xuất thành công ${excelData.length} văn bản!`);
-      setIsModalOpen(false); // Đóng modal khi xong
+      setIsModalOpen(false); 
       
     } catch (error) {
       alert("Có lỗi xảy ra trong quá trình trộn dữ liệu. Vui lòng kiểm tra lại các từ khóa {key} trong file Word.");
@@ -235,9 +277,6 @@ export default function TaoVanBanClient() {
 
   if (isChecking) return null;
 
-  // ==========================================
-  // GIAO DIỆN ĐĂNG NHẬP
-  // ==========================================
   if (!isLoggedIn) {
     return (
       <div className="min-h-[80vh] flex items-center justify-center">
@@ -269,24 +308,19 @@ export default function TaoVanBanClient() {
     );
   }
 
-  // ==========================================
-  // GIAO DIỆN CHÍNH
-  // ==========================================
   return (
     <div className="space-y-6 max-w-6xl mx-auto animate-in fade-in duration-500">
       
-      {/* HEADER TỔNG */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Quản Lý & Tạo Văn Bản Tự Động</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Quản lý kho mẫu văn bản và kết xuất dữ liệu hàng loạt.</p>
+          <p className="text-sm text-slate-500 mt-0.5">Kho mẫu của bạn được bảo lưu an toàn ngay trên trình duyệt hiện tại.</p>
         </div>
         <button onClick={handleLogout} className="px-4 py-2.5 text-sm font-bold text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors">
           Đăng xuất
         </button>
       </div>
 
-      {/* KHU VỰC QUẢN LÝ MẪU */}
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
           <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
@@ -302,7 +336,6 @@ export default function TaoVanBanClient() {
           </button>
         </div>
 
-        {/* BẢNG DANH SÁCH MẪU */}
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm whitespace-nowrap">
             <thead className="bg-slate-50 text-slate-500 border-b border-slate-200 text-xs uppercase tracking-wider">
@@ -371,9 +404,7 @@ export default function TaoVanBanClient() {
         </div>
       </div>
 
-      {/* ========================================== */}
-      {/* MODAL SỬ DỤNG MẪU (TẢI DATA & KẾT XUẤT) */}
-      {/* ========================================== */}
+      {/* MODAL SỬ DỤNG MẪU */}
       {isModalOpen && activeTemplate && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl w-full max-w-xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
