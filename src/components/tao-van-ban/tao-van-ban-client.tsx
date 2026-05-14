@@ -3,130 +3,105 @@
 import { useState, useEffect, useRef } from "react";
 import { 
   FileText, Upload, LockKeyhole, User, FileSpreadsheet, 
-  FileArchive, Download, PlayCircle, Trash2, X, PlusCircle, History, CalendarClock, Table
+  Download, PlayCircle, Trash2, X, PlusCircle, History, 
+  Table, Loader2, CheckCircle2, AlertCircle, FileArchive,
+  CalendarClock
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import PizZip from "pizzip";
 import Docxtemplater from "docxtemplater";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
-import { verifyLogin } from "@/src/app/tao-van-ban/action";
 
-// Interface định nghĩa cấu trúc Lịch sử (ĐÃ THÊM dataSnapshot)
 interface TemplateHistory {
   id: string;
   excelName: string;
   recordCount: number;
-  date: Date;
-  dataSnapshot?: any[]; // Mảng lưu toàn bộ nội dung file Excel
+  createdAt: string;
+  dataSnapshot?: any[];
 }
 
 interface TemplateItem {
   id: string;
   name: string;
-  file: File;
+  fileBase64: string; 
   keys: string[];
-  createdAt: Date;
+  createdAt: string;
   histories: TemplateHistory[];
 }
 
-// =========================================
-// HỆ QUẢN TRỊ CSDL CỤC BỘ (INDEXED-DB)
-// =========================================
-const initDB = (): Promise<IDBDatabase> => {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open("DocGenDB", 2); 
-    request.onupgradeneeded = (e: any) => {
-      const db = e.target.result;
-      if (!db.objectStoreNames.contains("templates")) {
-        db.createObjectStore("templates", { keyPath: "id" });
-      }
-    };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-};
-
-const saveTemplateToDB = async (template: TemplateItem) => {
-  const db = await initDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction("templates", "readwrite");
-    tx.objectStore("templates").put(template); 
-    tx.oncomplete = () => resolve(true);
-    tx.onerror = () => reject(tx.error);
-  });
-};
-
-const getTemplatesFromDB = async (): Promise<TemplateItem[]> => {
-  const db = await initDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction("templates", "readonly");
-    const req = tx.objectStore("templates").getAll();
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-};
-
-const deleteTemplateFromDB = async (id: string) => {
-  const db = await initDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction("templates", "readwrite");
-    tx.objectStore("templates").delete(id);
-    tx.oncomplete = () => resolve(true);
-    tx.onerror = () => reject(tx.error);
-  });
-};
-
-// =========================================
-// COMPONENT CHÍNH
-// =========================================
 export default function TaoVanBanClient() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isChecking, setIsChecking] = useState(true);
+  const [isLoadingDB, setIsLoadingDB] = useState(true);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-
+  
   const [templates, setTemplates] = useState<TemplateItem[]>([]);
-  const wordInputRef = useRef<HTMLInputElement>(null);
-
   const [activeTemplate, setActiveTemplate] = useState<TemplateItem | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [excelFile, setExcelFile] = useState<File | null>(null);
-  const [excelData, setExcelData] = useState<any[]>([]);
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [processingId, setProcessingId] = useState<string | null>(null);
+  const [historyTemplate, setHistoryTemplate] = useState<TemplateItem | null>(null);
+  
+  // Đã thêm lại dòng này để fix lỗi
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+  
+  const [previewData, setPreviewData] = useState<any[] | null>(null);
+  const [toast, setToast] = useState<{msg: string, type: 'success'|'error'|'info'} | null>(null);
+
+  const wordInputRef = useRef<HTMLInputElement>(null);
   const excelInputRef = useRef<HTMLInputElement>(null);
 
-  // States cho Lịch sử & Xem trước Dữ liệu
-  const [historyTemplate, setHistoryTemplate] = useState<TemplateItem | null>(null);
-  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
-  const [previewData, setPreviewData] = useState<any[] | null>(null); // State chứa data để xem chi tiết
+  const showToast = (msg: string, type: 'success'|'error'|'info') => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 4000);
+  };
+
+  const fetchTemplates = async () => {
+    setIsLoadingDB(true);
+    try {
+      const res = await fetch('/api/tao-van-ban');
+      const data = await res.json();
+      if (Array.isArray(data)) setTemplates(data);
+    } catch {
+      showToast("Lỗi kết nối đến máy chủ", "error");
+    } finally {
+      setIsLoadingDB(false);
+    }
+  };
 
   useEffect(() => {
     const session = sessionStorage.getItem("auth_tao_van_ban");
-    if (session === "true") setIsLoggedIn(true);
+    if (session === "true") {
+      setIsLoggedIn(true);
+      fetchTemplates();
+    }
     setIsChecking(false);
-
-    getTemplatesFromDB().then((data) => {
-      const safeData = data.map(t => ({ ...t, histories: t.histories || [] }));
-      const sorted = safeData.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-      setTemplates(sorted);
-    }).catch(err => console.error("Lỗi load Database cục bộ:", err));
   }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError("");
-    const res = await verifyLogin(username, password);
-    if (res.success) {
+    if (username === "admin" && password === "admin123123") {
       sessionStorage.setItem("auth_tao_van_ban", "true");
       setIsLoggedIn(true);
-    } else setError(res.message||"Lỗi!");
+      fetchTemplates();
+    } else {
+      showToast("Tài khoản hoặc mật khẩu không chính xác", "error");
+    }
   };
 
   const handleLogout = () => {
     sessionStorage.removeItem("auth_tao_van_ban");
     setIsLoggedIn(false);
+    setTemplates([]);
+  };
+
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = error => reject(error);
+    });
   };
 
   const handleWordSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -134,120 +109,124 @@ export default function TaoVanBanClient() {
     if (wordInputRef.current) wordInputRef.current.value = ''; 
 
     if (file && file.name.endsWith('.docx')) {
+      if (file.size > 3 * 1024 * 1024) {
+        showToast("File Word quá lớn (> 3MB)", "error");
+        return;
+      }
+
+      setIsLoadingDB(true);
       try {
         const arrayBuffer = await file.arrayBuffer();
         const zip = new PizZip(arrayBuffer);
         const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
-        
         const text = doc.getFullText();
-        const regex = /\{([a-zA-Z0-9_A-ÀÁÂÃÈÉÊÌÍÒÓÔÕÙÚĂĐĨŨƠàáâãèéêìíòóôõùúăđĩũơƯĂẠẢẤẦẨẪẬẮẰẲẴẶẸẺẼỀỀỂưăạảấầẩẫậắằẳẵặẹẻẽềềểỄỆỈỊỌỎỐỒỔỖỘỚỜỞỠỢỤỦỨỪễệỉịọỏốồổỗộớờởỡợụủứừỬỮỰỲỴÝỶỸửữựỳỵỷỹ\s]+)\}/g;
+        
+        const regex = /\{([^}]+)\}/g; 
         let match;
         const extractedKeys = new Set<string>();
 
         while ((match = regex.exec(text)) !== null) {
-          extractedKeys.add(match[1].trim());
+          let key = match[1].trim();
+          if (key.startsWith('#') || key.startsWith('/')) key = key.substring(1).trim();
+          if (key.length > 0 && key.length < 50) extractedKeys.add(key);
         }
-
-        const newTemplate: TemplateItem = {
-          id: Date.now().toString(),
-          name: file.name,
-          file: file,
-          keys: Array.from(extractedKeys),
-          createdAt: new Date(),
-          histories: [] 
-        };
-
-        await saveTemplateToDB(newTemplate);
-        setTemplates(prev => [newTemplate, ...prev]);
 
         if (extractedKeys.size === 0) {
-          alert(`File "${file.name}" đã được tải lên, nhưng không tìm thấy từ khóa {key} nào.`);
+          showToast("Không tìm thấy từ khóa {key} nào trong file", "error");
+          setIsLoadingDB(false);
+          return;
         }
 
+        const base64String = await fileToBase64(file);
+        const res = await fetch('/api/tao-van-ban', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'CREATE_TEMPLATE',
+            name: file.name,
+            fileBase64: base64String,
+            keys: Array.from(extractedKeys)
+          })
+        });
+
+        if (res.ok) {
+          const newTemplate = await res.json();
+          setTemplates(prev => [newTemplate, ...prev]);
+          showToast("Đã thêm mẫu văn bản mới", "success");
+        } else {
+          showToast("Lỗi lưu trữ mẫu lên hệ thống", "error");
+        }
       } catch (err) {
-        alert("File Word bị lỗi hoặc không thể đọc. Vui lòng kiểm tra lại định dạng.");
+        showToast("Lỗi đọc định dạng file Word", "error");
+      } finally {
+        setIsLoadingDB(false);
       }
     } else if (file) {
-      alert("Chỉ hỗ trợ tải lên file Word định dạng .docx");
+      showToast("Chỉ hỗ trợ định dạng .docx", "error");
+    }
+  };
+
+  const removeTemplate = async (id: string) => {
+    if(confirm("Bạn có chắc muốn xóa mẫu này?")) {
+      setTemplates(templates.filter(t => t.id !== id));
+      await fetch(`/api/tao-van-ban?id=${id}`, { method: 'DELETE' });
+      showToast("Đã xóa mẫu văn bản", "info");
     }
   };
 
   const downloadExcelTemplate = (template: TemplateItem) => {
-    if (template.keys.length === 0) {
-      alert("Mẫu này không có từ khóa nào để tạo file Excel.");
-      return;
-    }
     const headerRow: any = {};
     template.keys.forEach(key => { headerRow[key] = "" });
-
     const worksheet = XLSX.utils.json_to_sheet([headerRow]);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Data_Mau");
-
     const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
     const dataBlob = new Blob([excelBuffer], {type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
     saveAs(dataBlob, `Data_Mau_${template.name.replace('.docx', '')}.xlsx`);
   };
 
-  const removeTemplate = async (id: string) => {
-    if(confirm("Bạn có chắc muốn xóa mẫu này khỏi danh sách? Lịch sử cũng sẽ bị xóa theo.")) {
-      await deleteTemplateFromDB(id);
-      setTemplates(templates.filter(t => t.id !== id));
-    }
-  };
-
-  const openUseModal = (template: TemplateItem) => {
+  const triggerProcess = (template: TemplateItem) => {
     setActiveTemplate(template);
-    setExcelFile(null);
-    setExcelData([]);
-    setIsModalOpen(true);
+    if (excelInputRef.current) excelInputRef.current.click();
   };
 
-  const openHistoryModal = (template: TemplateItem) => {
-    setHistoryTemplate(template);
-    setIsHistoryModalOpen(true);
-  };
-
-  const handleExcelSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleExcelAutoProcess = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    if (!file || !activeTemplate) return;
     if (excelInputRef.current) excelInputRef.current.value = '';
 
-    if (file && (file.name.endsWith('.xlsx') || file.name.endsWith('.xls'))) {
-      setExcelFile(file);
-      try {
-        const data = await file.arrayBuffer();
-        const workbook = XLSX.read(data, { type: "array" });
-        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-        const jsonData = XLSX.utils.sheet_to_json(firstSheet);
-        setExcelData(jsonData);
-      } catch (err) {
-        alert("Không thể đọc dữ liệu file Excel.");
-        setExcelFile(null);
-        setExcelData([]);
-      }
+    if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
+      showToast("Chỉ hỗ trợ file Excel (.xlsx, .xls)", "error");
+      return;
     }
-  };
 
-  // THUẬT TOÁN KẾT XUẤT VÀ LƯU LỊCH SỬ (CÓ CHỨA NỘI DUNG DATA)
-  const handleGenerate = async () => {
-    if (!activeTemplate || !excelFile || excelData.length === 0) return;
-    setIsGenerating(true);
+    setProcessingId(activeTemplate.id);
+    showToast("Đang kết xuất dữ liệu...", "info");
 
     try {
-      const wordBuffer = await activeTemplate.file.arrayBuffer();
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data, { type: "array" });
+      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+      const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+
+      if (jsonData.length === 0) {
+        showToast("File Excel không có dữ liệu", "error");
+        setProcessingId(null);
+        return;
+      }
+
+      const response = await fetch(activeTemplate.fileBase64);
+      const wordBuffer = await response.arrayBuffer();
       const zipOutput = new JSZip();
 
-      excelData.forEach((row, index) => {
+      jsonData.forEach((row: any, index: number) => {
         const zip = new PizZip(wordBuffer);
         const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
-        
         doc.render(row);
-        
         const outDocBuffer = doc.getZip().generate({
           type: "blob",
           mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         });
-
         const personName = row['HoTen'] || row['Tên'] || row['Name'] || `So_${index + 1}`;
         zipOutput.file(`VanBan_${personName}.docx`, outDocBuffer);
       });
@@ -255,167 +234,156 @@ export default function TaoVanBanClient() {
       const zipBlob = await zipOutput.generateAsync({ type: "blob" });
       saveAs(zipBlob, `Ket_Xuat_${activeTemplate.name.replace('.docx', '')}_${new Date().getTime()}.zip`);
       
-      // === TẠO VÀ LƯU LỊCH SỬ KÈM TOÀN BỘ DATA NỘI DUNG ===
-      const newHistory: TemplateHistory = {
-        id: Date.now().toString(),
-        excelName: excelFile.name,
-        recordCount: excelData.length,
-        date: new Date(),
-        dataSnapshot: excelData // LƯU TOÀN BỘ JSON CỦA EXCEL VÀO ĐÂY
-      };
+      const res = await fetch('/api/tao-van-ban', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'SAVE_HISTORY',
+          templateId: activeTemplate.id,
+          excelName: file.name,
+          recordCount: jsonData.length,
+          dataSnapshot: jsonData
+        })
+      });
 
-      const updatedTemplate = {
-        ...activeTemplate,
-        histories: [newHistory, ...(activeTemplate.histories || [])]
-      };
-
-      await saveTemplateToDB(updatedTemplate);
-      setTemplates(prev => prev.map(t => t.id === updatedTemplate.id ? updatedTemplate : t));
-
-      alert(`🎉 Đã kết xuất thành công ${excelData.length} văn bản! Lịch sử và dữ liệu đã được lưu lại.`);
-      setIsModalOpen(false); 
-      
+      if (res.ok) {
+        const newHistory = await res.json();
+        setTemplates(prev => prev.map(t => t.id === activeTemplate.id ? { ...t, histories: [newHistory, ...t.histories] } : t));
+        showToast(`Xuất thành công ${jsonData.length} văn bản`, "success");
+      }
     } catch (error) {
-      alert("Có lỗi xảy ra trong quá trình trộn dữ liệu. Vui lòng kiểm tra lại các từ khóa {key} trong file Word.");
+      showToast("Lỗi trộn dữ liệu, kiểm tra lại biến trong file mẫu", "error");
     } finally {
-      setIsGenerating(false);
+      setProcessingId(null);
     }
   };
 
   if (isChecking) return null;
 
-  // ==========================================
-  // GIAO DIỆN ĐĂNG NHẬP
-  // ==========================================
   if (!isLoggedIn) {
     return (
       <div className="min-h-[80vh] flex items-center justify-center">
         <div className="bg-white p-8 rounded-2xl shadow-xl border border-slate-100 w-full max-w-md animate-in fade-in zoom-in-95 duration-300">
           <div className="flex flex-col items-center mb-8">
-            <div className="bg-blue-50 p-3 rounded-full mb-3"><LockKeyhole className="w-8 h-8 text-blue-600" /></div>
-            <h1 className="text-2xl font-bold text-slate-800">Cổng Tạo Văn Bản</h1>
+            <div className="bg-slate-100 p-4 rounded-full mb-4"><LockKeyhole className="w-8 h-8 text-slate-800" /></div>
+            <h1 className="text-2xl font-bold text-slate-800">Truy Cập Hệ Thống</h1>
+            <p className="text-sm text-slate-500 mt-1">Trình kết xuất văn bản tự động</p>
           </div>
-          <form onSubmit={handleLogin} className="space-y-5">
-            <div>
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-wide block mb-1.5">Tài khoản</label>
-              <div className="relative">
-                <User className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input type="text" required value={username} onChange={(e) => setUsername(e.target.value)} className="w-full pl-10 p-3 border border-slate-300 rounded-xl bg-slate-50 focus:bg-white text-slate-900 font-medium focus:ring-2 focus:ring-blue-500 outline-none transition-all" />
-              </div>
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div className="relative">
+              <User className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input type="text" required value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Tài khoản" className="w-full pl-10 p-3.5 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white text-slate-900 font-medium focus:ring-2 focus:ring-slate-800 outline-none transition-all" />
             </div>
-            <div>
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-wide block mb-1.5">Mật khẩu</label>
-              <div className="relative">
-                <LockKeyhole className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} className="w-full pl-10 p-3 border border-slate-300 rounded-xl bg-slate-50 focus:bg-white text-slate-900 font-medium focus:ring-2 focus:ring-blue-500 outline-none transition-all" />
-              </div>
+            <div className="relative">
+              <LockKeyhole className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Mật khẩu" className="w-full pl-10 p-3.5 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white text-slate-900 font-medium focus:ring-2 focus:ring-slate-800 outline-none transition-all" />
             </div>
-            {error && <p className="text-sm text-red-500 font-medium text-center bg-red-50 py-2 rounded-lg">{error}</p>}
-            <button type="submit" className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg transition-all">Đăng Nhập</button>
+            <button type="submit" className="w-full py-3.5 mt-2 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-xl shadow-md transition-all">Đăng Nhập</button>
           </form>
         </div>
+        
+        {toast && (
+          <div className={`fixed top-6 right-6 px-4 py-3 rounded-lg shadow-xl border flex items-center gap-3 animate-in slide-in-from-right-full z-50 ${toast.type === 'error' ? 'bg-red-50 border-red-200 text-red-700' : 'bg-emerald-50 border-emerald-200 text-emerald-700'}`}>
+            {toast.type === 'error' ? <AlertCircle className="w-5 h-5" /> : <CheckCircle2 className="w-5 h-5" />}
+            <span className="font-semibold text-sm">{toast.msg}</span>
+          </div>
+        )}
       </div>
     );
   }
 
-  // ==========================================
-  // GIAO DIỆN CHÍNH
-  // ==========================================
   return (
-    <div className="space-y-6 max-w-[1200px] mx-auto animate-in fade-in duration-500">
+    <div className="space-y-6 max-w-7xl mx-auto animate-in fade-in duration-500">
       
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Quản Lý & Tạo Văn Bản Tự Động</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Lưu trữ mẫu và truy xuất lịch sử dữ liệu an toàn trên trình duyệt.</p>
+      {toast && (
+        <div className={`fixed top-6 right-6 px-4 py-3 rounded-lg shadow-xl border flex items-center gap-3 animate-in slide-in-from-right-full z-[100] ${toast.type === 'error' ? 'bg-red-50 border-red-200 text-red-700' : toast.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-blue-50 border-blue-200 text-blue-700'}`}>
+          {toast.type === 'error' ? <AlertCircle className="w-5 h-5" /> : toast.type === 'success' ? <CheckCircle2 className="w-5 h-5" /> : <Loader2 className="w-5 h-5 animate-spin" />}
+          <span className="font-semibold text-sm">{toast.msg}</span>
         </div>
-        <button onClick={handleLogout} className="px-4 py-2.5 text-sm font-bold text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors">
-          Đăng xuất
-        </button>
-      </div>
+      )}
 
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-          <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-            <FileText className="w-5 h-5 text-blue-600"/> Danh sách Mẫu văn bản
-          </h2>
-          
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+        <div>
+          <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+            Quản Lý Mẫu Văn Bản {isLoadingDB && <Loader2 className="w-4 h-4 text-slate-400 animate-spin" />}
+          </h1>
+          <p className="text-sm text-slate-500 mt-0.5">Kết xuất hàng loạt với 1 click tải lên Excel</p>
+        </div>
+        <div className="flex items-center gap-3">
           <input type="file" ref={wordInputRef} onChange={handleWordSelect} accept=".docx" className="hidden" />
           <button 
             onClick={() => wordInputRef.current?.click()} 
-            className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all shadow-md text-sm"
+            disabled={isLoadingDB}
+            className="flex items-center gap-2 px-5 py-2 bg-slate-800 hover:bg-slate-900 disabled:opacity-50 text-white rounded-lg font-bold transition-all shadow-sm text-sm"
           >
-            <PlusCircle className="w-4 h-4" /> Tải lên mẫu Word mới
+            <PlusCircle className="w-4 h-4" /> Tải lên File Mẫu (.docx)
           </button>
+          <button onClick={handleLogout} className="px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">Đăng xuất</button>
         </div>
+      </div>
 
+      <input type="file" ref={excelInputRef} onChange={handleExcelAutoProcess} accept=".xlsx, .xls" className="hidden" />
+
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden min-h-[500px]">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm whitespace-nowrap">
             <thead className="bg-slate-50 text-slate-500 border-b border-slate-200 text-xs uppercase tracking-wider">
               <tr>
                 <th className="px-5 py-4 font-bold w-12 text-center">STT</th>
-                <th className="px-5 py-4 font-bold">Tên Mẫu Văn Bản</th>
-                <th className="px-5 py-4 font-bold text-center">Biến số</th>
-                <th className="px-5 py-4 font-bold text-center">Dữ Liệu Mẫu</th>
-                <th className="px-5 py-4 font-bold text-center">Lịch sử xuất</th>
-                <th className="px-5 py-4 font-bold text-center">Thao tác</th>
+                <th className="px-5 py-4 font-bold">Tên Mẫu</th>
+                <th className="px-5 py-4 font-bold text-center">Thống kê</th>
+                <th className="px-5 py-4 font-bold text-right">Thao tác xử lý</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {templates.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-slate-400">
-                    <FileText className="w-12 h-12 mx-auto mb-3 text-slate-300" />
-                    <p className="font-medium text-base text-slate-500">Chưa có mẫu văn bản nào được tải lên</p>
-                    <p className="text-sm mt-1">Bấm nút "Tải lên mẫu Word mới" để bắt đầu</p>
+                  <td colSpan={4} className="py-20 text-center text-slate-400">
+                    <FileArchive className="w-12 h-12 mx-auto mb-3 text-slate-300 stroke-1" />
+                    <p className="font-medium text-base text-slate-500">{isLoadingDB ? 'Đang đồng bộ...' : 'Chưa có mẫu văn bản'}</p>
                   </td>
                 </tr>
               ) : (
                 templates.map((template, index) => {
-                  const historyCount = template.histories?.length || 0;
-
+                  const isProcessing = processingId === template.id;
                   return (
-                    <tr key={template.id} className="hover:bg-slate-50 transition-colors">
+                    <tr key={template.id} className="hover:bg-slate-50/80 transition-colors">
                       <td className="px-5 py-4 text-center font-bold text-slate-400">{index + 1}</td>
-                      <td className="px-5 py-4 font-bold text-slate-800">
-                        <div className="flex items-center gap-2">
-                          <FileText className="w-4 h-4 text-blue-500 shrink-0"/>
-                          <span className="truncate max-w-[200px]" title={template.name}>{template.name}</span>
+                      <td className="px-5 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-blue-50 text-blue-600 rounded-lg"><FileText className="w-5 h-5"/></div>
+                          <div>
+                            <p className="font-bold text-slate-800 truncate max-w-[250px]">{template.name}</p>
+                            <p className="text-xs text-slate-500 mt-0.5">{template.keys.length} từ khóa được định nghĩa</p>
+                          </div>
                         </div>
                       </td>
                       <td className="px-5 py-4 text-center">
-                        <span className="bg-slate-100 text-slate-600 font-bold px-2.5 py-1 rounded-md text-[11px]">
-                          {template.keys.length} từ khóa
-                        </span>
-                      </td>
-                      <td className="px-5 py-4 text-center">
                         <button 
-                          onClick={() => downloadExcelTemplate(template)}
-                          className="inline-flex items-center gap-1.5 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 font-bold px-3 py-1.5 rounded-lg transition-colors text-xs"
+                          onClick={() => {setHistoryTemplate(template); setIsHistoryModalOpen(true);}}
+                          className="inline-flex items-center gap-1.5 font-bold px-3 py-1.5 rounded-lg transition-colors text-xs text-slate-600 hover:bg-slate-100"
                         >
-                          <Download className="w-4 h-4" /> Tải Excel
+                          <History className="w-4 h-4" /> {template.histories?.length || 0} lần xuất
                         </button>
                       </td>
-                      <td className="px-5 py-4 text-center">
-                        <button 
-                          onClick={() => openHistoryModal(template)}
-                          className={`inline-flex items-center gap-1.5 font-bold px-3 py-1.5 rounded-lg transition-colors text-xs ${historyCount > 0 ? 'text-indigo-600 hover:bg-indigo-50 hover:text-indigo-700' : 'text-slate-400 hover:bg-slate-100'}`}
-                        >
-                          <History className="w-4 h-4" /> {historyCount} lần
-                        </button>
-                      </td>
-                      <td className="px-5 py-4 text-center">
-                        <div className="flex items-center justify-center gap-2">
+                      <td className="px-5 py-4 text-right">
+                        <div className="flex items-center justify-end gap-2">
                           <button 
-                            onClick={() => openUseModal(template)}
-                            className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-900 text-white font-bold px-4 py-1.5 rounded-lg transition-colors shadow-sm text-xs"
+                            onClick={() => downloadExcelTemplate(template)}
+                            className="flex items-center gap-1.5 px-3 py-2 text-slate-600 hover:text-slate-900 bg-white border border-slate-200 hover:bg-slate-50 font-semibold rounded-lg transition-all shadow-sm text-xs"
                           >
-                            <PlayCircle className="w-4 h-4" /> Sử dụng
+                            <Download className="w-4 h-4" /> Excel Mẫu
+                          </button>
+                          <button 
+                            onClick={() => triggerProcess(template)}
+                            disabled={isProcessing || processingId !== null}
+                            className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold px-4 py-2 rounded-lg transition-all shadow-sm text-xs"
+                          >
+                            {isProcessing ? <><Loader2 className="w-4 h-4 animate-spin"/> Đang xử lý</> : <><PlayCircle className="w-4 h-4" /> Ghép dữ liệu</>}
                           </button>
                           <button 
                             onClick={() => removeTemplate(template.id)}
-                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                            title="Xóa mẫu"
+                            className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 border border-transparent hover:border-red-100 rounded-lg transition-colors"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -430,110 +398,35 @@ export default function TaoVanBanClient() {
         </div>
       </div>
 
-      {/* MODAL SỬ DỤNG MẪU (Tải Data & Xuất ZIP) */}
-      {isModalOpen && activeTemplate && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
-            <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-              <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                <PlayCircle className="w-5 h-5 text-slate-800"/> Ghép Dữ Liệu: {activeTemplate.name}
-              </h2>
-              <button onClick={() => setIsModalOpen(false)} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"><X className="w-5 h-5" /></button>
-            </div>
-            
-            <div className="p-6">
-              <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wide mb-3">Tải lên dữ liệu bảng (.xlsx)</h3>
-              
-              <div 
-                onClick={() => excelInputRef.current?.click()} 
-                className={`border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center text-center cursor-pointer transition-colors ${excelFile ? 'border-emerald-300 bg-emerald-50/50' : 'border-slate-300 hover:bg-slate-50 hover:border-emerald-400'}`}
-              >
-                <input type="file" ref={excelInputRef} onChange={handleExcelSelect} accept=".xlsx, .xls" className="hidden" />
-                
-                {excelFile ? (
-                  <div className="flex flex-col items-center animate-in zoom-in-95">
-                    <FileSpreadsheet className="w-10 h-10 text-emerald-600 mb-3" />
-                    <p className="text-sm font-bold text-slate-800">{excelFile.name}</p>
-                    <p className="text-xs text-emerald-600 font-bold mt-1">Chuẩn bị xuất {excelData.length} văn bản</p>
-                  </div>
-                ) : (
-                  <>
-                    <div className="bg-emerald-50 p-3 rounded-full mb-3"><Upload className="w-6 h-6 text-emerald-500" /></div>
-                    <p className="text-sm font-bold text-slate-700 mb-1">Click để tải lên file Excel dữ liệu</p>
-                    <p className="text-xs text-slate-500">Dữ liệu phải có các cột khớp với file mẫu</p>
-                  </>
-                )}
-              </div>
-            </div>
-
-            <div className="p-4 border-t border-slate-100 flex justify-end gap-3 bg-slate-50">
-              <button onClick={() => setIsModalOpen(false)} className="px-5 py-2.5 text-sm font-bold text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-100">Hủy bỏ</button>
-              <button 
-                onClick={handleGenerate}
-                disabled={!excelFile || excelData.length === 0 || isGenerating} 
-                className="flex items-center gap-2 px-6 py-2.5 text-sm font-bold text-white bg-slate-800 rounded-lg hover:bg-slate-900 disabled:opacity-50 shadow-md transition-all"
-              >
-                {isGenerating ? 'Đang xử lý...' : <><FileArchive className="w-4 h-4" /> Kết xuất ZIP</>}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL LỊCH SỬ (XEM DANH SÁCH LẦN XUẤT) */}
       {isHistoryModalOpen && historyTemplate && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-40 p-4">
           <div className="bg-white rounded-2xl w-full max-w-4xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-200">
             <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
               <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                <History className="w-5 h-5 text-indigo-600"/> Lịch sử xuất: <span className="truncate max-w-[300px] font-medium ml-1">{historyTemplate.name}</span>
+                <History className="w-5 h-5 text-slate-500"/> Lịch sử: <span className="truncate max-w-[300px] font-medium ml-1">{historyTemplate.name}</span>
               </h2>
-              <button onClick={() => setIsHistoryModalOpen(false)} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"><X className="w-5 h-5" /></button>
+              <button onClick={() => setIsHistoryModalOpen(false)} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-200 rounded-lg transition-colors"><X className="w-5 h-5" /></button>
             </div>
             
             <div className="overflow-y-auto flex-1 p-0">
               {(!historyTemplate.histories || historyTemplate.histories.length === 0) ? (
-                <div className="py-16 text-center text-slate-400">
-                  <CalendarClock className="w-12 h-12 mx-auto mb-3 text-slate-300" />
-                  <p className="font-medium text-base text-slate-500">Mẫu này chưa được sử dụng lần nào</p>
-                </div>
+                <div className="py-16 text-center text-slate-400"><CalendarClock className="w-12 h-12 mx-auto mb-3 text-slate-200" /><p className="font-medium text-base">Chưa có dữ liệu xuất</p></div>
               ) : (
                 <table className="w-full text-left text-sm whitespace-nowrap">
-                  <thead className="bg-slate-50 text-slate-500 sticky top-0 border-b border-slate-200 text-xs uppercase tracking-wider z-10">
-                    <tr>
-                      <th className="px-6 py-3 font-bold w-12 text-center">Lần</th>
-                      <th className="px-6 py-3 font-bold">Thời gian xuất</th>
-                      <th className="px-6 py-3 font-bold">File Excel Nguồn</th>
-                      <th className="px-6 py-3 font-bold text-center">Số VB</th>
-                      <th className="px-6 py-3 font-bold text-center">Nội dung đã đẩy</th>
-                    </tr>
+                  <thead className="bg-white text-slate-500 sticky top-0 border-b border-slate-200 text-xs uppercase tracking-wider z-10 shadow-sm">
+                    <tr><th className="px-6 py-4 font-bold w-12 text-center">Lần</th><th className="px-6 py-4 font-bold">Thời gian</th><th className="px-6 py-4 font-bold">Nguồn Excel</th><th className="px-6 py-4 font-bold text-center">Số VB</th><th className="px-6 py-4 font-bold text-right">Chi tiết</th></tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {historyTemplate.histories.map((hist, i) => (
                       <tr key={hist.id} className="hover:bg-slate-50 transition-colors">
                         <td className="px-6 py-4 text-center font-bold text-slate-400">{historyTemplate.histories.length - i}</td>
-                        <td className="px-6 py-4 font-semibold text-slate-700">
-                          {new Date(hist.date).toLocaleString('vi-VN', {timeZone: 'Asia/Ho_Chi_Minh'})}
-                        </td>
-                        <td className="px-6 py-4 font-medium text-indigo-700 flex items-center gap-2">
-                          <FileSpreadsheet className="w-4 h-4 text-emerald-500"/> {hist.excelName}
-                        </td>
-                        <td className="px-6 py-4 text-center">
-                          <span className="bg-blue-100 text-blue-700 font-bold px-3 py-1 rounded-full text-xs">
-                            +{hist.recordCount} file
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-center">
+                        <td className="px-6 py-4 font-medium text-slate-600">{new Date(hist.createdAt).toLocaleString('vi-VN')}</td>
+                        <td className="px-6 py-4 font-medium text-slate-800 flex items-center gap-2"><FileSpreadsheet className="w-4 h-4 text-slate-400"/> {hist.excelName}</td>
+                        <td className="px-6 py-4 text-center"><span className="bg-slate-100 text-slate-700 font-bold px-3 py-1 rounded-md text-xs">{hist.recordCount} file</span></td>
+                        <td className="px-6 py-4 text-right">
                           {hist.dataSnapshot && hist.dataSnapshot.length > 0 ? (
-                            <button 
-                              onClick={() => setPreviewData(hist.dataSnapshot!)}
-                              className="inline-flex items-center gap-1.5 text-blue-600 hover:text-blue-700 hover:bg-blue-50 font-bold px-3 py-1.5 rounded-lg transition-colors text-xs border border-blue-200"
-                            >
-                              <Table className="w-4 h-4" /> Xem dữ liệu
-                            </button>
-                          ) : (
-                            <span className="text-xs text-slate-400 italic">Không có data</span>
-                          )}
+                            <button onClick={() => setPreviewData(hist.dataSnapshot!)} className="inline-flex items-center gap-1.5 text-slate-600 hover:text-slate-900 bg-white font-bold px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 shadow-sm"><Table className="w-4 h-4" /> Xem data</button>
+                          ) : <span className="text-xs text-slate-400">Trống</span>}
                         </td>
                       </tr>
                     ))}
@@ -541,48 +434,18 @@ export default function TaoVanBanClient() {
                 </table>
               )}
             </div>
-
-            <div className="p-4 border-t border-slate-100 flex justify-end bg-slate-50">
-              <button onClick={() => setIsHistoryModalOpen(false)} className="px-6 py-2.5 text-sm font-bold text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-100 shadow-sm">Đóng</button>
-            </div>
           </div>
         </div>
       )}
 
-      {/* MODAL XEM CHI TIẾT DỮ LIỆU ĐÃ ĐẨY */}
       {previewData && (
-        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
-          <div className="bg-white rounded-2xl w-full max-w-6xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
-            <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-800 text-white">
-              <h2 className="text-lg font-bold flex items-center gap-2">
-                <Table className="w-5 h-5 text-blue-400"/> Chi tiết dữ liệu đã đẩy
-              </h2>
-              <button onClick={() => setPreviewData(null)} className="p-1.5 text-slate-300 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"><X className="w-5 h-5" /></button>
-            </div>
-            
+        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+          <div className="bg-white rounded-xl w-full max-w-6xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95">
+            <div className="p-4 border-b bg-slate-800 text-white flex justify-between items-center"><h2 className="text-base font-bold flex items-center gap-2"><Table className="w-4 h-4 text-slate-400"/> Dữ liệu nội dung</h2><button onClick={() => setPreviewData(null)} className="p-1.5 hover:bg-slate-700 rounded-lg"><X className="w-5 h-5" /></button></div>
             <div className="overflow-auto flex-1 p-0">
-              <table className="w-full text-left text-sm whitespace-nowrap">
-                <thead className="bg-slate-100 text-slate-600 sticky top-0 border-b border-slate-300 text-xs uppercase tracking-wider z-10 shadow-sm">
-                  <tr>
-                    <th className="px-4 py-3 font-bold text-center w-12 border-r border-slate-200">STT</th>
-                    {Object.keys(previewData[0]).map((key, i) => (
-                      <th key={i} className="px-4 py-3 font-bold border-r border-slate-200">{key}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200">
-                  {previewData.map((row, rowIndex) => (
-                    <tr key={rowIndex} className="hover:bg-blue-50/50 transition-colors">
-                      <td className="px-4 py-3 text-center font-bold text-slate-400 border-r border-slate-100">{rowIndex + 1}</td>
-                      {Object.keys(previewData[0]).map((key, colIndex) => (
-                        <td key={colIndex} className="px-4 py-3 text-slate-700 font-medium border-r border-slate-100 max-w-[250px] truncate" title={row[key]}>
-                          {row[key]}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <table className="w-full text-left text-sm whitespace-nowrap"><thead className="bg-slate-50 sticky top-0 border-b text-xs uppercase z-10 shadow-sm text-slate-600"><tr><th className="px-4 py-3 font-bold text-center w-12 border-r">STT</th>{Object.keys(previewData[0]).map((key, i) => <th key={i} className="px-4 py-3 font-bold border-r">{key}</th>)}</tr></thead><tbody className="divide-y">
+                {previewData.map((row, rowIndex) => <tr key={rowIndex} className="hover:bg-slate-50"><td className="px-4 py-3 text-center font-bold text-slate-400 border-r">{rowIndex + 1}</td>{Object.keys(previewData[0]).map((key, colIndex) => <td key={colIndex} className="px-4 py-3 text-slate-700 border-r max-w-[300px] truncate" title={row[key]}>{row[key]}</td>)}</tr>)}
+              </tbody></table>
             </div>
           </div>
         </div>

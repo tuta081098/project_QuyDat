@@ -61,3 +61,25 @@ model ProjectHistory {
   project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
 }
+
+model DocTemplate {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  name        String   
+  fileBase64  String   
+  keys        String[] // LƯU MẢNG TỪ KHÓA
+  createdAt   DateTime @default(now())
+  
+  histories   DocHistory[]
+}
+
+model DocHistory {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  templateId  String   @db.ObjectId
+  template    DocTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  
+  excelName   String   
+  recordCount Int      
+  dataSnapshot Json    
+  
+  createdAt   DateTime @default(now())
+}
