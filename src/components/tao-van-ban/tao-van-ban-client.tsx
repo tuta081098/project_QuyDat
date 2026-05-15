@@ -208,7 +208,6 @@ export default function TaoVanBanClient() {
     }
   };
 
-  // ĐÃ FIX TYPE SCRIPT LỖI ANY VÀ UNUSED MATCH
   const resolveFileName = (pattern: string, row: any, index: number) => {
     if (!pattern) return `File_${index + 1}`;
     let result = pattern.replace(/\{([^}]+)\}/g, (_match: string, key: string) => {
@@ -219,8 +218,22 @@ export default function TaoVanBanClient() {
     return result.replace(/[<>:"/\\|?*]/g, '').trim() || `File_${index + 1}`;
   };
 
+  // Hàm encode ký tự đặc biệt cho XML để tránh lỗi file
+  const escapeXml = (unsafeStr: string) => {
+    return unsafeStr.replace(/[<>&'"]/g, (c) => {
+      switch (c) {
+        case '<': return '&lt;';
+        case '>': return '&gt;';
+        case '&': return '&amp;';
+        case '\'': return '&apos;';
+        case '"': return '&quot;';
+        default: return c;
+      }
+    });
+  };
+
   // ===============================================
-  // KẾT XUẤT (DOCX & XLSX)
+  // KẾT XUẤT (DOCX & XLSX - GIỮ NGUYÊN 100% ĐỊNH DẠNG)
   // ===============================================
   const handleGenerate = async () => {
     if (!activeTemplate || !excelFile || excelData.length === 0) return;
@@ -234,7 +247,9 @@ export default function TaoVanBanClient() {
       const templateBuffer = await response.arrayBuffer();
       const zipOutput = new JSZip();
 
-      excelData.forEach((row, index) => {
+      // Sử dụng vòng lặp for...of để có thể sử dụng await bên trong
+      for (let index = 0; index < excelData.length; index++) {
+        const row = excelData[index];
         const finalFileName = resolveFileName(namingTemplate, row, index);
 
         // NẾU LÀ WORD
@@ -245,31 +260,35 @@ export default function TaoVanBanClient() {
           const outDocBuffer = doc.getZip().generate({ type: "blob", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
           zipOutput.file(`${finalFileName}.docx`, outDocBuffer);
         } 
-        // NẾU LÀ EXCEL
+        // NẾU LÀ EXCEL: Sử dụng JSZip can thiệp thẳng vào XML để giữ khung viền
         else if (isXlsx) {
-          const wb = XLSX.read(templateBuffer, { type: "array" });
+          const templateZip = await new JSZip().loadAsync(templateBuffer);
           
-          wb.SheetNames.forEach(sheetName => {
-            const sheet = wb.Sheets[sheetName];
-            for (const cell in sheet) {
-              if (!cell.startsWith('!') && sheet[cell].v && typeof sheet[cell].v === 'string') {
-                const originalStr = sheet[cell].v;
-                if (originalStr.includes('{')) {
-                  // ĐÃ FIX TYPE SCRIPT LỖI ANY VÀ UNUSED MATCH
-                  sheet[cell].v = originalStr.replace(/\{([^}]+)\}/g, (_match: string, key: string) => {
-                    const cleanKey = key.trim();
-                    if (cleanKey.toLowerCase() === 'index') return String(index + 1);
-                    return row[cleanKey] !== undefined && row[cleanKey] !== null ? String(row[cleanKey]) : "";
-                  });
-                }
-              }
-            }
-          });
+          // Tìm tất cả các file xml (bao gồm sharedStrings.xml và sheet.xml)
+          const xmlFiles = Object.keys(templateZip.files).filter(name => name.endsWith('.xml'));
 
-          const outBuffer = XLSX.write(wb, { type: "array", bookType: "xlsx" });
+          for (const fileName of xmlFiles) {
+            let content = await templateZip.file(fileName)?.async("string");
+            
+            if (content && content.includes('{')) {
+              const newContent = content.replace(/\{([^}]+)\}/g, (_match: string, key: string) => {
+                const cleanKey = key.trim();
+                let val = "";
+                if (cleanKey.toLowerCase() === 'index') {
+                  val = String(index + 1);
+                } else {
+                  val = row[cleanKey] !== undefined && row[cleanKey] !== null ? String(row[cleanKey]) : "";
+                }
+                return escapeXml(val);
+              });
+              templateZip.file(fileName, newContent);
+            }
+          }
+
+          const outBuffer = await templateZip.generateAsync({ type: "blob" });
           zipOutput.file(`${finalFileName}.xlsx`, outBuffer);
         }
-      });
+      }
 
       const zipBlob = await zipOutput.generateAsync({ type: "blob" });
       saveAs(zipBlob, `KetXuat_${activeTemplate.name.split('.')[0]}_${new Date().getTime()}.zip`);
@@ -288,8 +307,9 @@ export default function TaoVanBanClient() {
 
       fetchTemplates();
       setIsModalOpen(false);
-      showToast("Kết xuất thành công", "success");
-    } catch {
+      showToast("Kết xuất thành công, đã giữ nguyên định dạng!", "success");
+    } catch (error) {
+      console.error(error);
       showToast("Lỗi trong quá trình trộn dữ liệu", "error");
     } finally {
       setIsGenerating(false);
