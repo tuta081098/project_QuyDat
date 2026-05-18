@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { 
   FileText, Upload, LockKeyhole, User, FileSpreadsheet, 
   Download, PlayCircle, Trash2, X, PlusCircle, History, 
-  Table, Loader2, CheckCircle2, AlertCircle, FileArchive, Settings, Info, ChevronDown, ChevronUp, Clock
+  Table, Loader2, CheckCircle2, AlertCircle, FileArchive, Settings, Info, ChevronDown, ChevronUp
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import PizZip from "pizzip";
@@ -396,14 +396,13 @@ export default function TaoVanBanClient() {
               <tr>
                 <th className="px-6 py-5 w-16 text-center">STT</th>
                 <th className="px-6 py-5">Tên file mẫu</th>
-                <th className="px-6 py-5">Cập nhật</th>
                 <th className="px-6 py-5 text-center">Lịch sử</th>
                 <th className="px-6 py-5 text-right">Hành động</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
               {templates.length === 0 ? (
-                <tr><td colSpan={5} className="py-24 text-center text-slate-300 font-bold italic">Chưa có mẫu nào trên hệ thống</td></tr>
+                <tr><td colSpan={4} className="py-24 text-center text-slate-300 font-bold italic">Chưa có mẫu nào trên hệ thống</td></tr>
               ) : (
                 templates.map((t, i) => (
                   <tr key={t.id} className="group hover:bg-slate-50/50 transition-all">
@@ -414,12 +413,6 @@ export default function TaoVanBanClient() {
                           {t.name.endsWith('.xlsx') ? <FileSpreadsheet className="w-5 h-5"/> : <FileText className="w-5 h-5"/>}
                         </div>
                         <span className="font-bold text-slate-800">{t.name}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-5">
-                      <div className="flex flex-col gap-0.5">
-                        <span className="text-xs font-semibold text-slate-600 flex items-center gap-1"><Clock className="w-3 h-3"/> {new Date(t.updatedAt).toLocaleString('vi-VN')}</span>
-                        <span className="text-[10px] font-mono text-slate-400 bg-slate-100 w-fit px-1.5 py-0.5 rounded">IP: {t.updatedIp || 'N/A'}</span>
                       </div>
                     </td>
                     <td className="px-6 py-5 text-center">
@@ -442,7 +435,6 @@ export default function TaoVanBanClient() {
 
       <input type="file" ref={excelInputRef} onChange={handleExcelSelect} accept=".xlsx, .xls" className="hidden" />
 
-      {/* MODAL KẾT XUẤT */}
       {isModalOpen && activeTemplate && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-[32px] w-full max-w-xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300">
@@ -450,14 +442,12 @@ export default function TaoVanBanClient() {
               <h2 className="font-black text-slate-900 flex items-center gap-2 uppercase text-sm tracking-tighter"><Settings className="w-5 h-5" /> Cấu hình xuất: {activeTemplate.name.endsWith('.xlsx') ? 'EXCEL' : 'WORD'}</h2>
               <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-full transition-all"><X className="w-5 h-5" /></button>
             </div>
-            
             <div className="p-8 space-y-6">
               <div onClick={() => excelInputRef.current?.click()} className={`border-2 border-dashed rounded-3xl p-10 flex flex-col items-center justify-center text-center cursor-pointer transition-all ${excelFile ? 'border-emerald-200 bg-emerald-50/30 scale-[0.98]' : 'border-slate-100 hover:border-slate-300 bg-slate-50/50'}`}>
                 {excelFile ? (<><FileSpreadsheet className="w-12 h-12 text-emerald-600 mb-3" /><p className="font-bold text-slate-900">{excelFile.name}</p><p className="text-xs text-emerald-600 font-bold mt-1">Dữ liệu: {excelData.length} bản ghi</p></>) : (<><Upload className="w-10 h-10 text-slate-200 mb-3" /><p className="font-bold text-slate-400 text-sm">Nạp data Excel (.xlsx)</p></>)}
               </div>
-              
               {excelData.length > 0 && (
-                <div className="space-y-5 animate-in fade-in slide-in-from-bottom-4">
+                <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
                   <div>
                     <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Quy tắc đặt tên file con</label>
                     <input type="text" value={namingTemplate} onChange={(e) => setNamingTemplate(e.target.value)} placeholder="Ví dụ: vanban_{HO_TEN}_so_{index}" className="w-full p-4 border-2 border-slate-50 rounded-2xl focus:border-slate-900 focus:bg-white bg-slate-50 outline-none font-bold text-sm transition-all" />
@@ -466,24 +456,15 @@ export default function TaoVanBanClient() {
                       <p className="text-xs font-mono text-blue-700 font-bold break-all">{resolveFileName(namingTemplate, excelData[0], 0)}.{activeTemplate.name.endsWith('.xlsx') ? 'xlsx' : 'docx'}</p>
                     </div>
                   </div>
-                  
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <p className="text-[10px] font-black text-slate-400 uppercase">Biến hỗ trợ ({excelColumns.length}):</p>
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <span className="px-3 py-1.5 bg-slate-100 text-slate-500 rounded-lg text-[10px] font-bold border border-slate-200 uppercase">{"{index}"}</span>
-                      
-                      {/* LOGIC HIỂN THỊ THU GỌN/XEM THÊM BIẾN */}
-                      {(showAllKeys ? excelColumns : excelColumns.slice(0, 8)).map(c => (
-                        <span key={c} className="px-3 py-1.5 bg-white text-blue-600 rounded-lg text-[10px] font-bold border border-blue-100 uppercase">{"{" + c + "}"}</span>
-                      ))}
-                      
+                      {(showAllKeys ? excelColumns : excelColumns.slice(0, 8)).map(c => <span key={c} className="px-3 py-1.5 bg-white text-blue-600 rounded-lg text-[10px] font-bold border border-blue-100 uppercase">{"{" + c + "}"}</span>)}
                       {excelColumns.length > 8 && (
-                        <button 
-                          onClick={() => setShowAllKeys(!showAllKeys)} 
-                          className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-[10px] font-black border border-slate-200 uppercase transition-all flex items-center gap-1"
-                        >
+                        <button onClick={() => setShowAllKeys(!showAllKeys)} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-[10px] font-black border border-slate-200 uppercase transition-all flex items-center gap-1">
                           {showAllKeys ? <><ChevronUp className="w-3 h-3"/> Thu gọn</> : <><ChevronDown className="w-3 h-3"/> + {excelColumns.length - 8} biến nữa</>}
                         </button>
                       )}
@@ -500,7 +481,6 @@ export default function TaoVanBanClient() {
         </div>
       )}
 
-      {/* CÁC MODAL HISTORY VÀ PREVIEW KHÔNG THAY ĐỔI */}
       {isHistoryModalOpen && historyTemplate && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-[32px] w-full max-w-4xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] animate-in zoom-in-95">
@@ -518,7 +498,7 @@ export default function TaoVanBanClient() {
       {previewData && (
         <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-xl flex items-center justify-center z-[60] p-4">
           <div className="bg-white rounded-[40px] w-full max-w-6xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95">
-            <div className="p-6 border-b bg-slate-900 text-white flex justify-between items-center"><div className="flex items-center gap-3"><Table className="w-5 h-5 text-blue-400" /><h2 className="font-black uppercase text-xs tracking-widest">Dữ liệu lưu trữ</h2></div><button onClick={() => setPreviewData(null)}><X className="w-6 h-6 text-slate-500" /></button></div>
+            <div className="p-6 border-b bg-slate-900 text-white flex justify-between items-center"><div className="flex items-center gap-3"><Table className="w-5 h-5 text-blue-400" /><h2 className="font-black uppercase text-xs tracking-widest">Dữ liệu lưu trữ</h2></div><button onClick={() => setPreviewData(null)}><X className="w-6 h-6 text-slate-500 hover:text-white" /></button></div>
             <div className="overflow-auto flex-1"><table className="w-full text-left text-[11px] whitespace-nowrap border-collapse"><thead className="bg-slate-50 sticky top-0 border-b shadow-sm"><tr><th className="px-5 py-4 font-black text-slate-400 bg-slate-50 text-center w-12 border-r">#</th>{Object.keys(previewData[0] || {}).map(k => <th key={k} className="px-5 py-4 font-black text-slate-600 bg-slate-50 border-r">{k}</th>)}</tr></thead>
                 <tbody className="divide-y divide-slate-100">{previewData.map((row, idx) => (<tr key={idx} className="hover:bg-blue-50/30 transition-all"><td className="px-5 py-3 border-r text-center text-slate-300 font-bold">{idx + 1}</td>{Object.keys(previewData[0] || {}).map(k => <td key={k} className="px-5 py-3 border-r text-slate-600 font-medium">{row[k] !== undefined && row[k] !== null ? String(row[k]) : ""}</td>)}</tr>))}</tbody></table>
             </div>
