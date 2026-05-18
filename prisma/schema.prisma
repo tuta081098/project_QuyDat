@@ -68,7 +68,9 @@ model DocTemplate {
   fileBase64  String   
   keys        String[] // LƯU MẢNG TỪ KHÓA
   createdAt   DateTime @default(now())
-  
+  status      String   @default("ACTIVE")
+  updatedAt   DateTime @updatedAt
+  updatedIp   String?
   histories   DocHistory[]
 }
 
