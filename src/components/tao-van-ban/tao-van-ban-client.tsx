@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { 
   FileText, Upload, LockKeyhole, User, FileSpreadsheet, 
   Download, PlayCircle, Trash2, X, PlusCircle, History, 
-  Table, Loader2, CheckCircle2, AlertCircle, FileArchive, Settings, Info, ChevronDown, ChevronUp
+  Table, Loader2, CheckCircle2, AlertCircle, FileArchive, Settings, Info, ChevronDown, ChevronUp, Clock
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import PizZip from "pizzip";
@@ -235,7 +235,7 @@ export default function TaoVanBanClient() {
         const cols = Object.keys(mergedData[0] as object);
         setExcelColumns(cols);
         const autoCol = cols.find(c => ['hoten', 'tên', 'name', 'ho_ten'].includes(c.toLowerCase()));
-        setNamingTemplate(autoCol ? `File_{${autoCol}}` : "File_{index}");
+        setNamingTemplate(autoCol ? `{${autoCol}}` : "Data_{index}");
       }
     } catch {
       showToast("Lỗi đọc file Excel Dữ liệu", "error");
@@ -243,28 +243,18 @@ export default function TaoVanBanClient() {
   };
 
   const resolveFileName = (pattern: string, row: any, index: number) => {
-    if (!pattern) return `File_${index + 1}`;
+    if (!pattern) return `Sheet_${index + 1}`;
     let result = pattern.replace(/\{([^}]+)\}/g, (_match: string, key: string) => {
       const cleanKey = key.trim();
       if (cleanKey.toLowerCase() === 'index') return String(index + 1);
       return row[cleanKey] !== undefined && row[cleanKey] !== null ? String(row[cleanKey]) : "";
     });
-    return result.replace(/[<>:"/\\|?*]/g, '').trim() || `File_${index + 1}`;
+    return result.trim() || `Sheet_${index + 1}`;
   };
 
-  const escapeXml = (unsafeStr: string) => {
-    return unsafeStr.replace(/[<>&'"]/g, (c) => {
-      switch (c) {
-        case '<': return '&lt;';
-        case '>': return '&gt;';
-        case '&': return '&amp;';
-        case '\'': return '&apos;';
-        case '"': return '&quot;';
-        default: return c;
-      }
-    });
-  };
-
+  // ===============================================
+  // THUẬT TOÁN KẾT XUẤT ĐA NĂNG (WORD VÀ EXCEL)
+  // ===============================================
   const handleGenerate = async () => {
     if (!activeTemplate || !excelFile || excelData.length === 0) return;
     setIsGenerating(true);
@@ -275,44 +265,161 @@ export default function TaoVanBanClient() {
 
       const response = await fetch(activeTemplate.fileBase64);
       const templateBuffer = await response.arrayBuffer();
-      const zipOutput = new JSZip();
 
-      for (let index = 0; index < excelData.length; index++) {
-        const row = excelData[index];
-        const finalFileName = resolveFileName(namingTemplate, row, index);
-
-        if (isDocx) {
+      // ================== XỬ LÝ WORD ==================
+      if (isDocx) {
+        const zipOutput = new JSZip();
+        for (let index = 0; index < excelData.length; index++) {
+          const row = excelData[index];
+          // Word thì bỏ ký tự đặc biệt của hệ điều hành
+          const finalFileName = resolveFileName(namingTemplate, row, index).replace(/[<>:"/\\|?*]/g, '');
+          
           const zip = new PizZip(templateBuffer);
           const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true, nullGetter() { return ""; } });
           doc.render(row);
           const outDocBuffer = doc.getZip().generate({ type: "blob", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
           zipOutput.file(`${finalFileName}.docx`, outDocBuffer);
-        } 
-        else if (isXlsx) {
-          const templateZip = await new JSZip().loadAsync(templateBuffer);
-          const xmlFiles = Object.keys(templateZip.files).filter(name => name.endsWith('.xml'));
-
-          for (const fileName of xmlFiles) {
-            let content = await templateZip.file(fileName)?.async("string");
-            if (content && content.includes('{')) {
-              const newContent = content.replace(/\{([^}]+)\}/g, (_match: string, key: string) => {
-                const cleanKey = key.trim();
-                let val = "";
-                if (cleanKey.toLowerCase() === 'index') val = String(index + 1);
-                else val = row[cleanKey] !== undefined && row[cleanKey] !== null ? String(row[cleanKey]) : "";
-                return escapeXml(val);
-              });
-              templateZip.file(fileName, newContent);
-            }
-          }
-          const outBuffer = await templateZip.generateAsync({ type: "blob" });
-          zipOutput.file(`${finalFileName}.xlsx`, outBuffer);
         }
+        const zipBlob = await zipOutput.generateAsync({ type: "blob" });
+        saveAs(zipBlob, `KetXuat_${activeTemplate.name.split('.')[0]}_${new Date().getTime()}.zip`);
+      } 
+      
+      // ================== XỬ LÝ EXCEL ==================
+      else if (isXlsx) {
+        const templateZip = await new JSZip().loadAsync(templateBuffer);
+        const parser = new DOMParser();
+        const serializer = new XMLSerializer();
+
+        // 1. Phân tích file lưu trữ biến chung (SharedStrings) của Excel
+        let ssXmlStr = await templateZip.file("xl/sharedStrings.xml")?.async("string");
+        let sharedStrings: string[] = [];
+        if (ssXmlStr) {
+          const ssDoc = parser.parseFromString(ssXmlStr, "application/xml");
+          const siNodes = ssDoc.querySelectorAll("si");
+          siNodes.forEach(si => sharedStrings.push(si.textContent || ""));
+        }
+
+        // 2. Tìm Sheet Mẫu
+        let wbXmlStr = await templateZip.file("xl/workbook.xml")!.async("string");
+        let wbDoc = parser.parseFromString(wbXmlStr, "application/xml");
+        let sheetsNode = wbDoc.querySelector("sheets");
+        let templateSheetNode = sheetsNode!.querySelector("sheet");
+        let templateRId = templateSheetNode!.getAttribute("r:id");
+
+        // 3. Tìm đường dẫn thực tế của Sheet mẫu
+        let relsXmlStr = await templateZip.file("xl/_rels/workbook.xml.rels")!.async("string");
+        let relsDoc = parser.parseFromString(relsXmlStr, "application/xml");
+        let relNode = relsDoc.querySelector(`Relationship[Id="${templateRId}"]`);
+        let sheetPath = relNode!.getAttribute("Target");
+
+        let sheetXmlStr = await templateZip.file(`xl/${sheetPath}`)!.async("string");
+        
+        let ctXmlStr = await templateZip.file("[Content_Types].xml")!.async("string");
+        let ctDoc = parser.parseFromString(ctXmlStr, "application/xml");
+        let overrideNode = ctDoc.querySelector(`Override[PartName="/xl/${sheetPath}"]`);
+
+        const usedSheetNames = new Set();
+
+        // 4. Bắt đầu vòng lặp nhân bản Sheet cho từng người
+        for (let i = 0; i < excelData.length; i++) {
+          const row = excelData[i];
+          const rawSheetName = resolveFileName(namingTemplate, row, i);
+          
+          // Sheet Excel không cho phép một số ký tự và tối đa 31 chữ cái
+          let safeName = rawSheetName.replace(/[\\/?*:[\]]/g, '').substring(0, 31);
+          if (!safeName) safeName = `Sheet_${i + 1}`;
+          
+          let finalSheetName = safeName;
+          let counter = 1;
+          while (usedSheetNames.has(finalSheetName)) {
+              let suffix = `_${counter}`;
+              finalSheetName = safeName.substring(0, 31 - suffix.length) + suffix;
+              counter++;
+          }
+          usedSheetNames.add(finalSheetName);
+
+          const newSheetId = String(1000 + i);
+          const newRId = `rIdCustom${i}`;
+          const newSheetPath = `worksheets/sheetCustom${i}.xml`;
+
+          // Thay thế dữ liệu trên Sheet mới
+          let newSheetDoc = parser.parseFromString(sheetXmlStr, "application/xml");
+          let cNodes = newSheetDoc.querySelectorAll("c");
+          cNodes.forEach(cNode => {
+            let tAttr = cNode.getAttribute("t");
+            let vNode = cNode.querySelector("v");
+            if (vNode) {
+              let originalText = "";
+              if (tAttr === "s") {
+                let idx = parseInt(vNode.textContent || "0", 10);
+                originalText = sharedStrings[idx] || "";
+              } else if (tAttr === "inlineStr") {
+                let tNode = cNode.querySelector("t");
+                originalText = tNode ? (tNode.textContent || "") : "";
+              } else {
+                originalText = vNode.textContent || "";
+              }
+
+              if (originalText.includes("{")) {
+                let newText = originalText.replace(/\{([^}]+)\}/g, (_match: string, key: string) => {
+                  const cleanKey = key.trim();
+                  if (cleanKey.toLowerCase() === 'index') return String(i + 1);
+                  return row[cleanKey] !== undefined && row[cleanKey] !== null ? String(row[cleanKey]) : "";
+                });
+
+                // Gắn dữ liệu trực tiếp vào ô, ngắt kết nối với bảng SharedString
+                cNode.setAttribute("t", "inlineStr");
+                cNode.removeChild(vNode);
+                
+                let oldIs = cNode.querySelector("is");
+                if (oldIs) cNode.removeChild(oldIs);
+
+                const ns = cNode.namespaceURI;
+                let isNode = newSheetDoc.createElementNS(ns, "is");
+                let tNode = newSheetDoc.createElementNS(ns, "t");
+                tNode.textContent = newText; // textContent tự động xử lý ký tự XML an toàn
+                isNode.appendChild(tNode);
+                cNode.appendChild(isNode);
+              }
+            }
+          });
+
+          // Nén file Sheet mới
+          templateZip.file(`xl/${newSheetPath}`, serializer.serializeToString(newSheetDoc));
+
+          // Đăng ký Sheet mới vào Hệ thống Quản lý
+          let newSheetNode = templateSheetNode!.cloneNode(false) as Element;
+          newSheetNode.setAttribute("name", finalSheetName);
+          newSheetNode.setAttribute("sheetId", newSheetId);
+          newSheetNode.setAttribute("r:id", newRId);
+          sheetsNode!.appendChild(newSheetNode);
+
+          let newRelNode = relNode!.cloneNode(false) as Element;
+          newRelNode.setAttribute("Id", newRId);
+          newRelNode.setAttribute("Target", newSheetPath);
+          relsDoc.documentElement.appendChild(newRelNode);
+
+          if (overrideNode) {
+              let newOverrideNode = overrideNode.cloneNode(false) as Element;
+              newOverrideNode.setAttribute("PartName", `/xl/${newSheetPath}`);
+              ctDoc.documentElement.appendChild(newOverrideNode);
+          }
+        }
+
+        // Xóa Sheet Mẫu để chỉ giữ lại các Sheet thành phẩm
+        templateSheetNode!.remove();
+        templateZip.remove(`xl/${sheetPath}`);
+
+        // Lưu cấu trúc lại
+        templateZip.file("xl/workbook.xml", serializer.serializeToString(wbDoc));
+        templateZip.file("xl/_rels/workbook.xml.rels", serializer.serializeToString(relsDoc));
+        templateZip.file("[Content_Types].xml", serializer.serializeToString(ctDoc));
+
+        const finalBlob = await templateZip.generateAsync({ type: "blob" });
+        saveAs(finalBlob, `KetXuat_${activeTemplate.name.split('.')[0]}_${new Date().getTime()}.xlsx`);
       }
 
-      const zipBlob = await zipOutput.generateAsync({ type: "blob" });
-      saveAs(zipBlob, `KetXuat_${activeTemplate.name.split('.')[0]}_${new Date().getTime()}.zip`);
-      
+      // Lưu trữ Lịch sử
       await fetch('/api/tao-van-ban', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -327,8 +434,9 @@ export default function TaoVanBanClient() {
 
       fetchTemplates();
       setIsModalOpen(false);
-      showToast("Kết xuất thành công!", "success");
+      showToast("Kết xuất thành công tuyệt đối!", "success");
     } catch (error) {
+      console.error(error);
       showToast("Lỗi trong quá trình trộn dữ liệu", "error");
     } finally {
       setIsGenerating(false);
@@ -348,7 +456,14 @@ export default function TaoVanBanClient() {
     setExcelFile(null);
     setExcelData([]);
     setExcelColumns([]);
-    setNamingTemplate("File_{index}");
+    
+    // Mặc định tên file (Word) hoặc tên Sheet (Excel)
+    if(template.name.endsWith('.xlsx')) {
+      setNamingTemplate("Sheet_{index}");
+    } else {
+      setNamingTemplate("File_{index}");
+    }
+    
     setShowAllKeys(false);
     setIsModalOpen(true);
   };
@@ -435,36 +550,56 @@ export default function TaoVanBanClient() {
 
       <input type="file" ref={excelInputRef} onChange={handleExcelSelect} accept=".xlsx, .xls" className="hidden" />
 
+      {/* MODAL KẾT XUẤT */}
       {isModalOpen && activeTemplate && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-[32px] w-full max-w-xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300">
             <div className="p-6 border-b border-slate-50 flex justify-between items-center bg-slate-50/30">
-              <h2 className="font-black text-slate-900 flex items-center gap-2 uppercase text-sm tracking-tighter"><Settings className="w-5 h-5" /> Cấu hình xuất: {activeTemplate.name.endsWith('.xlsx') ? 'EXCEL' : 'WORD'}</h2>
+              <h2 className="font-black text-slate-900 flex items-center gap-2 uppercase text-sm tracking-tighter">
+                <Settings className="w-5 h-5" /> 
+                {activeTemplate.name.endsWith('.xlsx') ? 'Xuất 1 File Excel (Nhiều Sheet)' : 'Xuất File ZIP (Nhiều Word)'}
+              </h2>
               <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-full transition-all"><X className="w-5 h-5" /></button>
             </div>
+            
             <div className="p-8 space-y-6">
               <div onClick={() => excelInputRef.current?.click()} className={`border-2 border-dashed rounded-3xl p-10 flex flex-col items-center justify-center text-center cursor-pointer transition-all ${excelFile ? 'border-emerald-200 bg-emerald-50/30 scale-[0.98]' : 'border-slate-100 hover:border-slate-300 bg-slate-50/50'}`}>
                 {excelFile ? (<><FileSpreadsheet className="w-12 h-12 text-emerald-600 mb-3" /><p className="font-bold text-slate-900">{excelFile.name}</p><p className="text-xs text-emerald-600 font-bold mt-1">Dữ liệu: {excelData.length} bản ghi</p></>) : (<><Upload className="w-10 h-10 text-slate-200 mb-3" /><p className="font-bold text-slate-400 text-sm">Nạp data Excel (.xlsx)</p></>)}
               </div>
+              
               {excelData.length > 0 && (
-                <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
+                <div className="space-y-5 animate-in fade-in slide-in-from-bottom-4">
                   <div>
-                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Quy tắc đặt tên file con</label>
+                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">
+                      {activeTemplate.name.endsWith('.xlsx') ? 'Quy tắc đặt tên Sheet' : 'Quy tắc đặt tên file con'}
+                    </label>
                     <input type="text" value={namingTemplate} onChange={(e) => setNamingTemplate(e.target.value)} placeholder="Ví dụ: vanban_{HO_TEN}_so_{index}" className="w-full p-4 border-2 border-slate-50 rounded-2xl focus:border-slate-900 focus:bg-white bg-slate-50 outline-none font-bold text-sm transition-all" />
                     <div className="mt-3 p-4 bg-blue-50/50 rounded-2xl border border-blue-100">
-                      <p className="text-[10px] text-blue-400 font-black uppercase mb-2 flex items-center gap-1"><Info className="w-3 h-3" /> Kết quả file mẫu (Dòng 1):</p>
-                      <p className="text-xs font-mono text-blue-700 font-bold break-all">{resolveFileName(namingTemplate, excelData[0], 0)}.{activeTemplate.name.endsWith('.xlsx') ? 'xlsx' : 'docx'}</p>
+                      <p className="text-[10px] text-blue-400 font-black uppercase mb-2 flex items-center gap-1"><Info className="w-3 h-3" /> Kết quả mẫu (Dòng 1):</p>
+                      <p className="text-xs font-mono text-blue-700 font-bold break-all">
+                        {activeTemplate.name.endsWith('.xlsx') 
+                          ? `Tên Sheet: ${resolveFileName(namingTemplate, excelData[0], 0).substring(0,31)}` 
+                          : `Tên File: ${resolveFileName(namingTemplate, excelData[0], 0)}.docx`}
+                      </p>
                     </div>
                   </div>
+                  
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <p className="text-[10px] font-black text-slate-400 uppercase">Biến hỗ trợ ({excelColumns.length}):</p>
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <span className="px-3 py-1.5 bg-slate-100 text-slate-500 rounded-lg text-[10px] font-bold border border-slate-200 uppercase">{"{index}"}</span>
-                      {(showAllKeys ? excelColumns : excelColumns.slice(0, 8)).map(c => <span key={c} className="px-3 py-1.5 bg-white text-blue-600 rounded-lg text-[10px] font-bold border border-blue-100 uppercase">{"{" + c + "}"}</span>)}
+                      
+                      {(showAllKeys ? excelColumns : excelColumns.slice(0, 8)).map(c => (
+                        <span key={c} className="px-3 py-1.5 bg-white text-blue-600 rounded-lg text-[10px] font-bold border border-blue-100 uppercase">{"{" + c + "}"}</span>
+                      ))}
+                      
                       {excelColumns.length > 8 && (
-                        <button onClick={() => setShowAllKeys(!showAllKeys)} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-[10px] font-black border border-slate-200 uppercase transition-all flex items-center gap-1">
+                        <button 
+                          onClick={() => setShowAllKeys(!showAllKeys)} 
+                          className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-[10px] font-black border border-slate-200 uppercase transition-all flex items-center gap-1"
+                        >
                           {showAllKeys ? <><ChevronUp className="w-3 h-3"/> Thu gọn</> : <><ChevronDown className="w-3 h-3"/> + {excelColumns.length - 8} biến nữa</>}
                         </button>
                       )}
@@ -475,7 +610,17 @@ export default function TaoVanBanClient() {
             </div>
             <div className="p-6 bg-slate-50/50 flex gap-3">
               <button onClick={() => setIsModalOpen(false)} className="flex-1 py-4 font-bold text-slate-400 hover:text-slate-600 transition-all">Hủy</button>
-              <button onClick={handleGenerate} disabled={!excelFile || isGenerating} className="flex-[2] py-4 bg-slate-900 text-white rounded-2xl font-bold flex items-center justify-center gap-2 shadow-xl shadow-slate-200 disabled:opacity-50 transition-all active:scale-95">{isGenerating ? <Loader2 className="w-5 h-5 animate-spin" /> : <FileArchive className="w-5 h-5" />} Bắt đầu tải về ZIP</button>
+              <button 
+                onClick={handleGenerate} 
+                disabled={!excelFile || isGenerating} 
+                className={`flex-[2] py-4 text-white rounded-2xl font-bold flex items-center justify-center gap-2 shadow-xl shadow-slate-200 disabled:opacity-50 transition-all active:scale-95 ${activeTemplate.name.endsWith('.xlsx') ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-slate-900 hover:bg-black'}`}
+              >
+                {isGenerating 
+                  ? <Loader2 className="w-5 h-5 animate-spin" /> 
+                  : (activeTemplate.name.endsWith('.xlsx') ? <FileSpreadsheet className="w-5 h-5" /> : <FileArchive className="w-5 h-5" />)
+                } 
+                {activeTemplate.name.endsWith('.xlsx') ? 'Tải File Excel' : 'Tải File ZIP'}
+              </button>
             </div>
           </div>
         </div>
@@ -488,7 +633,7 @@ export default function TaoVanBanClient() {
             <div className="overflow-y-auto flex-1 p-0">
               <table className="w-full text-left text-sm"><thead className="bg-slate-50 sticky top-0 border-b text-[10px] font-black uppercase text-slate-400"><tr><th className="px-6 py-4">Thời gian</th><th className="px-6 py-4">Nguồn dữ liệu</th><th className="px-6 py-4 text-center">Số lượng</th><th className="px-6 py-4 text-right">Thao tác</th></tr></thead>
                 <tbody className="divide-y divide-slate-50">{historyTemplate.histories.map((h, i) => (
-                    <tr key={h.id} className="hover:bg-slate-50/50 transition-all"><td className="px-6 py-5 font-bold text-slate-500">{new Date(h.createdAt).toLocaleString('vi-VN')}</td><td className="px-6 py-5 font-bold text-slate-800 truncate max-w-[200px]">{h.excelName}</td><td className="px-6 py-5 text-center"><span className="bg-blue-50 text-blue-600 px-3 py-1 rounded-full font-black text-[10px]">{h.recordCount} file</span></td><td className="px-6 py-5 text-right"><button onClick={() => setPreviewData(h.dataSnapshot!)} className="text-[10px] font-black uppercase border-2 border-slate-100 px-3 py-1.5 rounded-xl hover:bg-slate-900 hover:text-white hover:border-slate-900 transition-all">Chi tiết</button></td></tr>
+                    <tr key={h.id} className="hover:bg-slate-50/50 transition-all"><td className="px-6 py-5 font-bold text-slate-500">{new Date(h.createdAt).toLocaleString('vi-VN')}</td><td className="px-6 py-5 font-bold text-slate-800 truncate max-w-[200px]">{h.excelName}</td><td className="px-6 py-5 text-center"><span className="bg-blue-50 text-blue-600 px-3 py-1 rounded-full font-black text-[10px]">{h.recordCount} {historyTemplate.name.endsWith('.xlsx') ? 'sheet' : 'file'}</span></td><td className="px-6 py-5 text-right"><button onClick={() => setPreviewData(h.dataSnapshot!)} className="text-[10px] font-black uppercase border-2 border-slate-100 px-3 py-1.5 rounded-xl hover:bg-slate-900 hover:text-white hover:border-slate-900 transition-all">Chi tiết</button></td></tr>
                   ))}</tbody></table>
             </div>
           </div>
@@ -498,7 +643,7 @@ export default function TaoVanBanClient() {
       {previewData && (
         <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-xl flex items-center justify-center z-[60] p-4">
           <div className="bg-white rounded-[40px] w-full max-w-6xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95">
-            <div className="p-6 border-b bg-slate-900 text-white flex justify-between items-center"><div className="flex items-center gap-3"><Table className="w-5 h-5 text-blue-400" /><h2 className="font-black uppercase text-xs tracking-widest">Dữ liệu lưu trữ</h2></div><button onClick={() => setPreviewData(null)}><X className="w-6 h-6 text-slate-500 hover:text-white" /></button></div>
+            <div className="p-6 border-b bg-slate-900 text-white flex justify-between items-center"><div className="flex items-center gap-3"><Table className="w-5 h-5 text-blue-400" /><h2 className="font-black uppercase text-xs tracking-widest">Dữ liệu lưu trữ</h2></div><button onClick={() => setPreviewData(null)}><X className="w-6 h-6 text-slate-500" /></button></div>
             <div className="overflow-auto flex-1"><table className="w-full text-left text-[11px] whitespace-nowrap border-collapse"><thead className="bg-slate-50 sticky top-0 border-b shadow-sm"><tr><th className="px-5 py-4 font-black text-slate-400 bg-slate-50 text-center w-12 border-r">#</th>{Object.keys(previewData[0] || {}).map(k => <th key={k} className="px-5 py-4 font-black text-slate-600 bg-slate-50 border-r">{k}</th>)}</tr></thead>
                 <tbody className="divide-y divide-slate-100">{previewData.map((row, idx) => (<tr key={idx} className="hover:bg-blue-50/30 transition-all"><td className="px-5 py-3 border-r text-center text-slate-300 font-bold">{idx + 1}</td>{Object.keys(previewData[0] || {}).map(k => <td key={k} className="px-5 py-3 border-r text-slate-600 font-medium">{row[k] !== undefined && row[k] !== null ? String(row[k]) : ""}</td>)}</tr>))}</tbody></table>
             </div>
