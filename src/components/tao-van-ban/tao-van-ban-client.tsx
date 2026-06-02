@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { 
-  FileText, Upload, LockKeyhole, User, FileSpreadsheet, 
-  Download, PlayCircle, Trash2, X, PlusCircle, History, 
+import {
+  FileText, Upload, LockKeyhole, User, FileSpreadsheet,
+  Download, PlayCircle, Trash2, X, PlusCircle, History,
   Table, Loader2, CheckCircle2, AlertCircle, FileArchive, Settings, Info, ChevronDown, ChevronUp, Clock
 } from "lucide-react";
 import * as XLSX from "xlsx";
@@ -23,7 +23,7 @@ interface TemplateHistory {
 interface TemplateItem {
   id: string;
   name: string;
-  fileBase64: string; 
+  fileBase64: string;
   keys: string[];
   status: string;
   updatedAt: string;
@@ -38,29 +38,40 @@ export default function TaoVanBanClient() {
   const [isLoadingDB, setIsLoadingDB] = useState(true);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  
+
   const [templates, setTemplates] = useState<TemplateItem[]>([]);
   const [activeTemplate, setActiveTemplate] = useState<TemplateItem | null>(null);
-  
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [excelFile, setExcelFile] = useState<File | null>(null);
   const [excelData, setExcelData] = useState<any[]>([]);
   const [excelColumns, setExcelColumns] = useState<string[]>([]);
   const [namingTemplate, setNamingTemplate] = useState<string>("");
   const [showAllKeys, setShowAllKeys] = useState(false);
-  
+
   const [isGenerating, setIsGenerating] = useState(false);
   const [historyTemplate, setHistoryTemplate] = useState<TemplateItem | null>(null);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [previewData, setPreviewData] = useState<any[] | null>(null);
-  const [toast, setToast] = useState<{msg: string, type: 'success'|'error'|'info'} | null>(null);
+  const [toast, setToast] = useState<{ msg: string, type: 'success' | 'error' | 'info' } | null>(null);
 
   const templateInputRef = useRef<HTMLInputElement>(null);
   const excelInputRef = useRef<HTMLInputElement>(null);
 
-  const showToast = (msg: string, type: 'success'|'error'|'info') => {
+  // FIX 1: Thêm biến lưu bộ đếm thời gian cho Toast
+  const toastTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // FIX 2: Cập nhật hàm showToast để chống dính bộ đếm
+  const showToast = (msg: string, type: 'success' | 'error' | 'info') => {
     setToast({ msg, type });
-    setTimeout(() => setToast(null), 4000);
+
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
+
+    toastTimerRef.current = setTimeout(() => {
+      setToast(null);
+    }, 4000);
   };
 
   const fetchTemplates = async () => {
@@ -113,7 +124,7 @@ export default function TaoVanBanClient() {
 
   const handleTemplateSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (templateInputRef.current) templateInputRef.current.value = ''; 
+    if (templateInputRef.current) templateInputRef.current.value = '';
     if (!file) return;
 
     const isDocx = file.name.endsWith('.docx');
@@ -121,13 +132,13 @@ export default function TaoVanBanClient() {
 
     if (!isDocx && !isXlsx) return showToast("Chỉ hỗ trợ file mẫu .docx hoặc .xlsx", "error");
     if (file.size > 3 * 1024 * 1024) return showToast("File quá lớn (>3MB)", "error");
-    
+
     setIsLoadingDB(true);
 
     try {
       const arrayBuffer = await file.arrayBuffer();
       const extractedKeys = new Set<string>();
-      const regex = /\{([^}]+)\}/g; 
+      const regex = /\{([^}]+)\}/g;
 
       if (isDocx) {
         const zip = new PizZip(arrayBuffer);
@@ -198,14 +209,14 @@ export default function TaoVanBanClient() {
       const chunk = template.keys.slice(i, i + MAX_KEYS_PER_SHEET);
       const headerRow: any = {};
       chunk.forEach(key => { headerRow[key] = "" });
-      
+
       const worksheet = XLSX.utils.json_to_sheet([headerRow]);
       const sheetIndex = Math.floor(i / MAX_KEYS_PER_SHEET) + 1;
       XLSX.utils.book_append_sheet(workbook, worksheet, `Data_${sheetIndex}`);
     }
 
     const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-    const dataBlob = new Blob([excelBuffer], {type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    const dataBlob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     saveAs(dataBlob, `Mau_NhapLieu_${template.name.split('.')[0]}.xlsx`);
   };
 
@@ -230,7 +241,7 @@ export default function TaoVanBanClient() {
 
       mergedData = mergedData.filter(row => Object.keys(row).length > 0);
       setExcelData(mergedData);
-      
+
       if (mergedData.length > 0) {
         const cols = Object.keys(mergedData[0] as object);
         setExcelColumns(cols);
@@ -252,13 +263,23 @@ export default function TaoVanBanClient() {
     return result.trim() || `Sheet_${index + 1}`;
   };
 
-  // ===============================================
-  // THUẬT TOÁN KẾT XUẤT ĐA NĂNG (WORD VÀ EXCEL)
-  // ===============================================
+  const escapeXml = (unsafeStr: string) => {
+    return unsafeStr.replace(/[<>&'"]/g, (c) => {
+      switch (c) {
+        case '<': return '&lt;';
+        case '>': return '&gt;';
+        case '&': return '&amp;';
+        case '\'': return '&apos;';
+        case '"': return '&quot;';
+        default: return c;
+      }
+    });
+  };
+
   const handleGenerate = async () => {
     if (!activeTemplate || !excelFile || excelData.length === 0) return;
     setIsGenerating(true);
-    
+
     try {
       const isDocx = activeTemplate.name.endsWith('.docx');
       const isXlsx = activeTemplate.name.endsWith('.xlsx');
@@ -266,14 +287,12 @@ export default function TaoVanBanClient() {
       const response = await fetch(activeTemplate.fileBase64);
       const templateBuffer = await response.arrayBuffer();
 
-      // ================== XỬ LÝ WORD ==================
       if (isDocx) {
         const zipOutput = new JSZip();
         for (let index = 0; index < excelData.length; index++) {
           const row = excelData[index];
-          // Word thì bỏ ký tự đặc biệt của hệ điều hành
           const finalFileName = resolveFileName(namingTemplate, row, index).replace(/[<>:"/\\|?*]/g, '');
-          
+
           const zip = new PizZip(templateBuffer);
           const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true, nullGetter() { return ""; } });
           doc.render(row);
@@ -282,15 +301,12 @@ export default function TaoVanBanClient() {
         }
         const zipBlob = await zipOutput.generateAsync({ type: "blob" });
         saveAs(zipBlob, `KetXuat_${activeTemplate.name.split('.')[0]}_${new Date().getTime()}.zip`);
-      } 
-      
-      // ================== XỬ LÝ EXCEL ==================
+      }
       else if (isXlsx) {
         const templateZip = await new JSZip().loadAsync(templateBuffer);
         const parser = new DOMParser();
         const serializer = new XMLSerializer();
 
-        // 1. Phân tích file lưu trữ biến chung (SharedStrings) của Excel
         let ssXmlStr = await templateZip.file("xl/sharedStrings.xml")?.async("string");
         let sharedStrings: string[] = [];
         if (ssXmlStr) {
@@ -299,42 +315,38 @@ export default function TaoVanBanClient() {
           siNodes.forEach(si => sharedStrings.push(si.textContent || ""));
         }
 
-        // 2. Tìm Sheet Mẫu
         let wbXmlStr = await templateZip.file("xl/workbook.xml")!.async("string");
         let wbDoc = parser.parseFromString(wbXmlStr, "application/xml");
         let sheetsNode = wbDoc.querySelector("sheets");
         let templateSheetNode = sheetsNode!.querySelector("sheet");
         let templateRId = templateSheetNode!.getAttribute("r:id");
 
-        // 3. Tìm đường dẫn thực tế của Sheet mẫu
         let relsXmlStr = await templateZip.file("xl/_rels/workbook.xml.rels")!.async("string");
         let relsDoc = parser.parseFromString(relsXmlStr, "application/xml");
         let relNode = relsDoc.querySelector(`Relationship[Id="${templateRId}"]`);
         let sheetPath = relNode!.getAttribute("Target");
 
         let sheetXmlStr = await templateZip.file(`xl/${sheetPath}`)!.async("string");
-        
+
         let ctXmlStr = await templateZip.file("[Content_Types].xml")!.async("string");
         let ctDoc = parser.parseFromString(ctXmlStr, "application/xml");
         let overrideNode = ctDoc.querySelector(`Override[PartName="/xl/${sheetPath}"]`);
 
         const usedSheetNames = new Set();
 
-        // 4. Bắt đầu vòng lặp nhân bản Sheet cho từng người
         for (let i = 0; i < excelData.length; i++) {
           const row = excelData[i];
           const rawSheetName = resolveFileName(namingTemplate, row, i);
-          
-          // Sheet Excel không cho phép một số ký tự và tối đa 31 chữ cái
+
           let safeName = rawSheetName.replace(/[\\/?*:[\]]/g, '').substring(0, 31);
           if (!safeName) safeName = `Sheet_${i + 1}`;
-          
+
           let finalSheetName = safeName;
           let counter = 1;
           while (usedSheetNames.has(finalSheetName)) {
-              let suffix = `_${counter}`;
-              finalSheetName = safeName.substring(0, 31 - suffix.length) + suffix;
-              counter++;
+            let suffix = `_${counter}`;
+            finalSheetName = safeName.substring(0, 31 - suffix.length) + suffix;
+            counter++;
           }
           usedSheetNames.add(finalSheetName);
 
@@ -342,7 +354,6 @@ export default function TaoVanBanClient() {
           const newRId = `rIdCustom${i}`;
           const newSheetPath = `worksheets/sheetCustom${i}.xml`;
 
-          // Thay thế dữ liệu trên Sheet mới
           let newSheetDoc = parser.parseFromString(sheetXmlStr, "application/xml");
           let cNodes = newSheetDoc.querySelectorAll("c");
           cNodes.forEach(cNode => {
@@ -367,27 +378,24 @@ export default function TaoVanBanClient() {
                   return row[cleanKey] !== undefined && row[cleanKey] !== null ? String(row[cleanKey]) : "";
                 });
 
-                // Gắn dữ liệu trực tiếp vào ô, ngắt kết nối với bảng SharedString
                 cNode.setAttribute("t", "inlineStr");
                 cNode.removeChild(vNode);
-                
+
                 let oldIs = cNode.querySelector("is");
                 if (oldIs) cNode.removeChild(oldIs);
 
                 const ns = cNode.namespaceURI;
                 let isNode = newSheetDoc.createElementNS(ns, "is");
                 let tNode = newSheetDoc.createElementNS(ns, "t");
-                tNode.textContent = newText; // textContent tự động xử lý ký tự XML an toàn
+                tNode.textContent = newText;
                 isNode.appendChild(tNode);
                 cNode.appendChild(isNode);
               }
             }
           });
 
-          // Nén file Sheet mới
           templateZip.file(`xl/${newSheetPath}`, serializer.serializeToString(newSheetDoc));
 
-          // Đăng ký Sheet mới vào Hệ thống Quản lý
           let newSheetNode = templateSheetNode!.cloneNode(false) as Element;
           newSheetNode.setAttribute("name", finalSheetName);
           newSheetNode.setAttribute("sheetId", newSheetId);
@@ -400,17 +408,15 @@ export default function TaoVanBanClient() {
           relsDoc.documentElement.appendChild(newRelNode);
 
           if (overrideNode) {
-              let newOverrideNode = overrideNode.cloneNode(false) as Element;
-              newOverrideNode.setAttribute("PartName", `/xl/${newSheetPath}`);
-              ctDoc.documentElement.appendChild(newOverrideNode);
+            let newOverrideNode = overrideNode.cloneNode(false) as Element;
+            newOverrideNode.setAttribute("PartName", `/xl/${newSheetPath}`);
+            ctDoc.documentElement.appendChild(newOverrideNode);
           }
         }
 
-        // Xóa Sheet Mẫu để chỉ giữ lại các Sheet thành phẩm
         templateSheetNode!.remove();
         templateZip.remove(`xl/${sheetPath}`);
 
-        // Lưu cấu trúc lại
         templateZip.file("xl/workbook.xml", serializer.serializeToString(wbDoc));
         templateZip.file("xl/_rels/workbook.xml.rels", serializer.serializeToString(relsDoc));
         templateZip.file("[Content_Types].xml", serializer.serializeToString(ctDoc));
@@ -419,7 +425,6 @@ export default function TaoVanBanClient() {
         saveAs(finalBlob, `KetXuat_${activeTemplate.name.split('.')[0]}_${new Date().getTime()}.xlsx`);
       }
 
-      // Lưu trữ Lịch sử
       await fetch('/api/tao-van-ban', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -456,23 +461,41 @@ export default function TaoVanBanClient() {
     setExcelFile(null);
     setExcelData([]);
     setExcelColumns([]);
-    
-    // Mặc định tên file (Word) hoặc tên Sheet (Excel)
-    if(template.name.endsWith('.xlsx')) {
+
+    if (template.name.endsWith('.xlsx')) {
       setNamingTemplate("Sheet_{index}");
     } else {
       setNamingTemplate("File_{index}");
     }
-    
+
     setShowAllKeys(false);
     setIsModalOpen(true);
   };
+
+  // FIX 3: GIAO DIỆN TOAST CHUẨN Z-INDEX CAO NHẤT ĐƯỢC DÙNG CHUNG
+  const ToastComponent = toast && (
+    <div className={`fixed top-6 right-6 px-6 py-4 rounded-2xl shadow-2xl border flex items-center justify-between gap-4 z-[9999] animate-in slide-in-from-right-full duration-300 ${toast.type === 'error' ? 'bg-red-50 text-red-700 border-red-200' :
+        toast.type === 'success' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+          'bg-slate-900 text-white border-slate-800'
+      }`}>
+      <div className="flex items-center gap-2">
+        {toast.type === 'error' ? <AlertCircle className="w-5 h-5" /> :
+          toast.type === 'success' ? <CheckCircle2 className="w-5 h-5" /> :
+            <Info className="w-5 h-5" />}
+        <span className="font-bold text-sm">{toast.msg}</span>
+      </div>
+      <button onClick={() => setToast(null)} className="p-1 opacity-60 hover:opacity-100 hover:bg-black/5 rounded-lg transition-all">
+        <X className="w-4 h-4" />
+      </button>
+    </div>
+  );
 
   if (isChecking) return null;
 
   if (!isLoggedIn) {
     return (
       <div className="min-h-[80vh] flex items-center justify-center p-4">
+        {ToastComponent}
         <div className="bg-white p-8 rounded-3xl shadow-xl border w-full max-w-md animate-in fade-in zoom-in-95">
           <div className="flex flex-col items-center mb-8">
             <div className="bg-slate-100 p-4 rounded-2xl mb-4"><LockKeyhole className="w-8 h-8 text-slate-800" /></div>
@@ -490,7 +513,7 @@ export default function TaoVanBanClient() {
 
   return (
     <div className="max-w-7xl mx-auto p-4 md:p-8 space-y-6">
-      {toast && <div className={`fixed top-6 right-6 px-5 py-3 rounded-2xl shadow-2xl border flex items-center gap-3 z-[100] animate-in slide-in-from-right-full ${toast.type === 'error' ? 'bg-red-50 text-red-700 border-red-100' : 'bg-slate-900 text-white border-slate-800'}`}><span className="font-bold text-sm">{toast.msg}</span></div>}
+      {ToastComponent}
 
       <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
         <div>
@@ -500,7 +523,7 @@ export default function TaoVanBanClient() {
         <div className="flex gap-3">
           <input type="file" ref={templateInputRef} onChange={handleTemplateSelect} accept=".docx, .xlsx" className="hidden" />
           <button onClick={() => templateInputRef.current?.click()} className="px-6 py-3 bg-slate-900 text-white rounded-2xl font-bold text-sm flex items-center gap-2 hover:scale-105 transition-all shadow-md"><PlusCircle className="w-5 h-5" /> Tải Lên Mẫu</button>
-          <button onClick={handleLogout} className="p-3 text-slate-400 hover:text-red-500 transition-colors"><X className="w-6 h-6"/></button>
+          <button onClick={handleLogout} className="p-3 text-slate-400 hover:text-red-500 transition-colors"><X className="w-6 h-6" /></button>
         </div>
       </div>
 
@@ -525,19 +548,19 @@ export default function TaoVanBanClient() {
                     <td className="px-6 py-5">
                       <div className="flex items-center gap-3">
                         <div className={`p-2 rounded-xl ${t.name.endsWith('.xlsx') ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'}`}>
-                          {t.name.endsWith('.xlsx') ? <FileSpreadsheet className="w-5 h-5"/> : <FileText className="w-5 h-5"/>}
+                          {t.name.endsWith('.xlsx') ? <FileSpreadsheet className="w-5 h-5" /> : <FileText className="w-5 h-5" />}
                         </div>
                         <span className="font-bold text-slate-800">{t.name}</span>
                       </div>
                     </td>
                     <td className="px-6 py-5 text-center">
-                      <button onClick={() => {setHistoryTemplate(t); setIsHistoryModalOpen(true);}} className="bg-slate-100 text-slate-600 px-3 py-1.5 rounded-xl text-[11px] font-black group-hover:bg-blue-600 group-hover:text-white transition-all">{t.histories?.length || 0} lần</button>
+                      <button onClick={() => { setHistoryTemplate(t); setIsHistoryModalOpen(true); }} className="bg-slate-100 text-slate-600 px-3 py-1.5 rounded-xl text-[11px] font-black group-hover:bg-blue-600 group-hover:text-white transition-all">{t.histories?.length || 0} lần</button>
                     </td>
                     <td className="px-6 py-5">
                       <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all">
-                        <button onClick={() => downloadExcelTemplate(t)} className="p-2.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all" title="Tải File Nhập Liệu"><Download className="w-5 h-5"/></button>
-                        <button onClick={() => openUseModal(t)} className="bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-bold text-xs hover:bg-emerald-700 shadow-sm flex items-center gap-2 transition-all active:scale-95"><PlayCircle className="w-4 h-4"/> Ghép dữ liệu</button>
-                        <button onClick={() => removeTemplate(t.id)} className="p-2.5 text-slate-300 hover:text-red-500 rounded-xl transition-all" title="Xóa mềm"><Trash2 className="w-5 h-5"/></button>
+                        <button onClick={() => downloadExcelTemplate(t)} className="p-2.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all" title="Tải File Nhập Liệu"><Download className="w-5 h-5" /></button>
+                        <button onClick={() => openUseModal(t)} className="bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-bold text-xs hover:bg-emerald-700 shadow-sm flex items-center gap-2 transition-all active:scale-95"><PlayCircle className="w-4 h-4" /> Ghép dữ liệu</button>
+                        <button onClick={() => removeTemplate(t.id)} className="p-2.5 text-slate-300 hover:text-red-500 rounded-xl transition-all" title="Xóa mềm"><Trash2 className="w-5 h-5" /></button>
                       </div>
                     </td>
                   </tr>
@@ -556,17 +579,17 @@ export default function TaoVanBanClient() {
           <div className="bg-white rounded-[32px] w-full max-w-xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300">
             <div className="p-6 border-b border-slate-50 flex justify-between items-center bg-slate-50/30">
               <h2 className="font-black text-slate-900 flex items-center gap-2 uppercase text-sm tracking-tighter">
-                <Settings className="w-5 h-5" /> 
+                <Settings className="w-5 h-5" />
                 {activeTemplate.name.endsWith('.xlsx') ? 'Xuất 1 File Excel (Nhiều Sheet)' : 'Xuất File ZIP (Nhiều Word)'}
               </h2>
               <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-full transition-all"><X className="w-5 h-5" /></button>
             </div>
-            
+
             <div className="p-8 space-y-6">
               <div onClick={() => excelInputRef.current?.click()} className={`border-2 border-dashed rounded-3xl p-10 flex flex-col items-center justify-center text-center cursor-pointer transition-all ${excelFile ? 'border-emerald-200 bg-emerald-50/30 scale-[0.98]' : 'border-slate-100 hover:border-slate-300 bg-slate-50/50'}`}>
                 {excelFile ? (<><FileSpreadsheet className="w-12 h-12 text-emerald-600 mb-3" /><p className="font-bold text-slate-900">{excelFile.name}</p><p className="text-xs text-emerald-600 font-bold mt-1">Dữ liệu: {excelData.length} bản ghi</p></>) : (<><Upload className="w-10 h-10 text-slate-200 mb-3" /><p className="font-bold text-slate-400 text-sm">Nạp data Excel (.xlsx)</p></>)}
               </div>
-              
+
               {excelData.length > 0 && (
                 <div className="space-y-5 animate-in fade-in slide-in-from-bottom-4">
                   <div>
@@ -577,30 +600,30 @@ export default function TaoVanBanClient() {
                     <div className="mt-3 p-4 bg-blue-50/50 rounded-2xl border border-blue-100">
                       <p className="text-[10px] text-blue-400 font-black uppercase mb-2 flex items-center gap-1"><Info className="w-3 h-3" /> Kết quả mẫu (Dòng 1):</p>
                       <p className="text-xs font-mono text-blue-700 font-bold break-all">
-                        {activeTemplate.name.endsWith('.xlsx') 
-                          ? `Tên Sheet: ${resolveFileName(namingTemplate, excelData[0], 0).substring(0,31)}` 
+                        {activeTemplate.name.endsWith('.xlsx')
+                          ? `Tên Sheet: ${resolveFileName(namingTemplate, excelData[0], 0).substring(0, 31)}`
                           : `Tên File: ${resolveFileName(namingTemplate, excelData[0], 0)}.docx`}
                       </p>
                     </div>
                   </div>
-                  
+
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <p className="text-[10px] font-black text-slate-400 uppercase">Biến hỗ trợ ({excelColumns.length}):</p>
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <span className="px-3 py-1.5 bg-slate-100 text-slate-500 rounded-lg text-[10px] font-bold border border-slate-200 uppercase">{"{index}"}</span>
-                      
+
                       {(showAllKeys ? excelColumns : excelColumns.slice(0, 8)).map(c => (
                         <span key={c} className="px-3 py-1.5 bg-white text-blue-600 rounded-lg text-[10px] font-bold border border-blue-100 uppercase">{"{" + c + "}"}</span>
                       ))}
-                      
+
                       {excelColumns.length > 8 && (
-                        <button 
-                          onClick={() => setShowAllKeys(!showAllKeys)} 
+                        <button
+                          onClick={() => setShowAllKeys(!showAllKeys)}
                           className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-[10px] font-black border border-slate-200 uppercase transition-all flex items-center gap-1"
                         >
-                          {showAllKeys ? <><ChevronUp className="w-3 h-3"/> Thu gọn</> : <><ChevronDown className="w-3 h-3"/> + {excelColumns.length - 8} biến nữa</>}
+                          {showAllKeys ? <><ChevronUp className="w-3 h-3" /> Thu gọn</> : <><ChevronDown className="w-3 h-3" /> + {excelColumns.length - 8} biến nữa</>}
                         </button>
                       )}
                     </div>
@@ -610,15 +633,15 @@ export default function TaoVanBanClient() {
             </div>
             <div className="p-6 bg-slate-50/50 flex gap-3">
               <button onClick={() => setIsModalOpen(false)} className="flex-1 py-4 font-bold text-slate-400 hover:text-slate-600 transition-all">Hủy</button>
-              <button 
-                onClick={handleGenerate} 
-                disabled={!excelFile || isGenerating} 
+              <button
+                onClick={handleGenerate}
+                disabled={!excelFile || isGenerating}
                 className={`flex-[2] py-4 text-white rounded-2xl font-bold flex items-center justify-center gap-2 shadow-xl shadow-slate-200 disabled:opacity-50 transition-all active:scale-95 ${activeTemplate.name.endsWith('.xlsx') ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-slate-900 hover:bg-black'}`}
               >
-                {isGenerating 
-                  ? <Loader2 className="w-5 h-5 animate-spin" /> 
+                {isGenerating
+                  ? <Loader2 className="w-5 h-5 animate-spin" />
                   : (activeTemplate.name.endsWith('.xlsx') ? <FileSpreadsheet className="w-5 h-5" /> : <FileArchive className="w-5 h-5" />)
-                } 
+                }
                 {activeTemplate.name.endsWith('.xlsx') ? 'Tải File Excel' : 'Tải File ZIP'}
               </button>
             </div>
@@ -626,6 +649,7 @@ export default function TaoVanBanClient() {
         </div>
       )}
 
+      {/* CÁC MODAL LỊCH SỬ & PREVIEW */}
       {isHistoryModalOpen && historyTemplate && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-[32px] w-full max-w-4xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] animate-in zoom-in-95">
@@ -633,8 +657,8 @@ export default function TaoVanBanClient() {
             <div className="overflow-y-auto flex-1 p-0">
               <table className="w-full text-left text-sm"><thead className="bg-slate-50 sticky top-0 border-b text-[10px] font-black uppercase text-slate-400"><tr><th className="px-6 py-4">Thời gian</th><th className="px-6 py-4">Nguồn dữ liệu</th><th className="px-6 py-4 text-center">Số lượng</th><th className="px-6 py-4 text-right">Thao tác</th></tr></thead>
                 <tbody className="divide-y divide-slate-50">{historyTemplate.histories.map((h, i) => (
-                    <tr key={h.id} className="hover:bg-slate-50/50 transition-all"><td className="px-6 py-5 font-bold text-slate-500">{new Date(h.createdAt).toLocaleString('vi-VN')}</td><td className="px-6 py-5 font-bold text-slate-800 truncate max-w-[200px]">{h.excelName}</td><td className="px-6 py-5 text-center"><span className="bg-blue-50 text-blue-600 px-3 py-1 rounded-full font-black text-[10px]">{h.recordCount} {historyTemplate.name.endsWith('.xlsx') ? 'sheet' : 'file'}</span></td><td className="px-6 py-5 text-right"><button onClick={() => setPreviewData(h.dataSnapshot!)} className="text-[10px] font-black uppercase border-2 border-slate-100 px-3 py-1.5 rounded-xl hover:bg-slate-900 hover:text-white hover:border-slate-900 transition-all">Chi tiết</button></td></tr>
-                  ))}</tbody></table>
+                  <tr key={h.id} className="hover:bg-slate-50/50 transition-all"><td className="px-6 py-5 font-bold text-slate-500">{new Date(h.createdAt).toLocaleString('vi-VN')}</td><td className="px-6 py-5 font-bold text-slate-800 truncate max-w-[200px]">{h.excelName}</td><td className="px-6 py-5 text-center"><span className="bg-blue-50 text-blue-600 px-3 py-1 rounded-full font-black text-[10px]">{h.recordCount} {historyTemplate.name.endsWith('.xlsx') ? 'sheet' : 'file'}</span></td><td className="px-6 py-5 text-right"><button onClick={() => setPreviewData(h.dataSnapshot!)} className="text-[10px] font-black uppercase border-2 border-slate-100 px-3 py-1.5 rounded-xl hover:bg-slate-900 hover:text-white hover:border-slate-900 transition-all">Chi tiết</button></td></tr>
+                ))}</tbody></table>
             </div>
           </div>
         </div>
@@ -645,7 +669,7 @@ export default function TaoVanBanClient() {
           <div className="bg-white rounded-[40px] w-full max-w-6xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95">
             <div className="p-6 border-b bg-slate-900 text-white flex justify-between items-center"><div className="flex items-center gap-3"><Table className="w-5 h-5 text-blue-400" /><h2 className="font-black uppercase text-xs tracking-widest">Dữ liệu lưu trữ</h2></div><button onClick={() => setPreviewData(null)}><X className="w-6 h-6 text-slate-500" /></button></div>
             <div className="overflow-auto flex-1"><table className="w-full text-left text-[11px] whitespace-nowrap border-collapse"><thead className="bg-slate-50 sticky top-0 border-b shadow-sm"><tr><th className="px-5 py-4 font-black text-slate-400 bg-slate-50 text-center w-12 border-r">#</th>{Object.keys(previewData[0] || {}).map(k => <th key={k} className="px-5 py-4 font-black text-slate-600 bg-slate-50 border-r">{k}</th>)}</tr></thead>
-                <tbody className="divide-y divide-slate-100">{previewData.map((row, idx) => (<tr key={idx} className="hover:bg-blue-50/30 transition-all"><td className="px-5 py-3 border-r text-center text-slate-300 font-bold">{idx + 1}</td>{Object.keys(previewData[0] || {}).map(k => <td key={k} className="px-5 py-3 border-r text-slate-600 font-medium">{row[k] !== undefined && row[k] !== null ? String(row[k]) : ""}</td>)}</tr>))}</tbody></table>
+              <tbody className="divide-y divide-slate-100">{previewData.map((row, idx) => (<tr key={idx} className="hover:bg-blue-50/30 transition-all"><td className="px-5 py-3 border-r text-center text-slate-300 font-bold">{idx + 1}</td>{Object.keys(previewData[0] || {}).map(k => <td key={k} className="px-5 py-3 border-r text-slate-600 font-medium">{row[k] !== undefined && row[k] !== null ? String(row[k]) : ""}</td>)}</tr>))}</tbody></table>
             </div>
           </div>
         </div>
