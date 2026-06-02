@@ -9,9 +9,10 @@ import {
   Building2, FileWarning, ClipboardList, Clock, 
   CheckCircle2, History, Plus, Info, Activity, 
   Edit3, Save, Calendar, AlertTriangle, BellRing, X,
-  LayoutGrid, List, FileSpreadsheet
+  LayoutGrid, List, FileSpreadsheet, Download
 } from "lucide-react";
 import * as XLSX from "xlsx";
+import { saveAs } from "file-saver";
 import { DASHBOARD_TEXT as T } from "@/src/constants/dashboard-text";
 
 const OPTION_TIENDO = ["Đấu giá", "HTKT", "Trường", "Đường", "Ngoài ngân sách", "Trung ương"];
@@ -116,6 +117,37 @@ export default function DashboardClient({ initialProjects }: any) {
   const totalChuaBanHanh = initialProjects.reduce((sum: number, p: any) => sum + (p.chuaBanHanhCount || 0), 0);
   const totalChuaKiemKe = initialProjects.reduce((sum: number, p: any) => sum + (p.chuaKiemKeCount || 0), 0);
   const totalDangGiaiQuyet = initialProjects.reduce((sum: number, p: any) => sum + (p.xacNhanCount || 0) + (p.duThaoCount || 0) + (p.thamDinhCount || 0) + (p.pheDuyetCount || 0), 0);
+
+  // Xử lý tải mẫu Excel
+  const handleDownloadTemplate = () => {
+    const templateData = [
+      {
+        name: "Dự án Mẫu ABC",
+        code: "DA-ABC-01",
+        deadline: "2026-12-31T23:59",
+        tienDoDuAn: "Đấu giá",
+        chiTiet: "Chưa nhận mốc",
+        donViDoDac: "Công ty Đo đạc XYZ",
+        canBoGPMB: "Nguyễn Văn A",
+        mo: "Khu vực có 10 ngôi",
+        ghiChu: "Đây là dữ liệu mẫu, vui lòng điền theo định dạng này",
+        chuaBanHanhCount: 5,
+        chuaKiemKeCount: 2,
+        xacNhanCount: 1,
+        duThaoCount: 0,
+        thamDinhCount: 3,
+        pheDuyetCount: 10
+      }
+    ];
+
+    const worksheet = XLSX.utils.json_to_sheet(templateData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Mau_Nhap_Lieu");
+    
+    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+    const dataBlob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    saveAs(dataBlob, `Mau_Nhap_Du_An.xlsx`);
+  };
 
   // Xử lý Import Excel
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -247,6 +279,11 @@ export default function DashboardClient({ initialProjects }: any) {
             <button onClick={() => setViewMode('GRID')} title="Dạng Lưới" className={`p-1.5 rounded-md flex items-center justify-center transition-all ${viewMode === 'GRID' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-800'}`}><LayoutGrid className="w-4 h-4" /></button>
             <button onClick={() => setViewMode('LIST')} title="Dạng Bảng" className={`p-1.5 rounded-md flex items-center justify-center transition-all ${viewMode === 'LIST' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-800'}`}><List className="w-4 h-4" /></button>
           </div>
+
+          {/* Tải mẫu Excel */}
+          <button onClick={handleDownloadTemplate} className="flex-1 md:flex-none flex justify-center items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 rounded-lg font-semibold transition-all shadow-sm text-sm">
+            <Download className="w-4 h-4" /> Tải file mẫu
+          </button>
 
           {/* Import Excel */}
           <input type="file" accept=".xlsx, .xls" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
