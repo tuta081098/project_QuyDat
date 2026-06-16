@@ -131,12 +131,12 @@ export default function DashboardClient({ initialProjects }: any) {
         canBoGPMB: "Nguyễn Văn A",
         mo: "Khu vực có 10 ngôi",
         ghiChu: "Đây là dữ liệu mẫu, vui lòng điền theo định dạng này",
-        chuaBanHanhCount: 5,
-        chuaKiemKeCount: 2,
-        xacNhanCount: 1,
+        chuaBanHanhCount: 0,
+        chuaKiemKeCount: 0,
+        xacNhanCount: 0,
         duThaoCount: 0,
-        thamDinhCount: 3,
-        pheDuyetCount: 10
+        thamDinhCount: 0,
+        pheDuyetCount: 0
       }
     ];
 
