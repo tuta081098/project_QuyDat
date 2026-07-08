@@ -85,3 +85,95 @@ model DocHistory {
   
   createdAt   DateTime @default(now())
 }
+
+// --- BẢNG DANH MỤC SẢN PHẨM ---
+model Category {
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  name      String
+  slug      String    @unique
+  status    String    @default("ACTIVE") // ACTIVE, HIDDEN
+  
+  products  Product[] // 1 Danh mục có nhiều Sản phẩm
+  
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+// --- BẢNG SẢN PHẨM ---
+model Product {
+  id          String      @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  slug        String      @unique
+  price       Int
+  stock       Int         @default(0)
+  image       String?
+  status      String      @default("ACTIVE") // ACTIVE, OUT_OF_STOCK, HIDDEN
+  
+  categoryId  String      @db.ObjectId
+  category    Category    @relation(fields: [categoryId], references: [id])
+  
+  orderItems  OrderItem[] // Sản phẩm nằm trong nhiều Đơn hàng
+  reviews     Review[]    // Sản phẩm có nhiều Đánh giá
+  
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+// --- BẢNG KHÁCH HÀNG ---
+model Customer {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  name      String
+  email     String   @unique
+  phone     String?
+  address   String?
+  
+  orders    Order[]  // 1 Khách hàng có nhiều Đơn hàng
+  reviews   Review[] // 1 Khách hàng có nhiều Đánh giá
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// --- BẢNG ĐƠN HÀNG ---
+model Order {
+  id          String      @id @default(auto()) @map("_id") @db.ObjectId
+  orderCode   String      @unique
+  totalAmount Int
+  status      String      @default("PENDING") // PENDING, SHIPPING, COMPLETED, CANCELLED
+  
+  customerId  String      @db.ObjectId
+  customer    Customer    @relation(fields: [customerId], references: [id])
+  
+  items       OrderItem[] // 1 Đơn hàng gồm nhiều Chi tiết sản phẩm
+  
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+// --- BẢNG CHI TIẾT ĐƠN HÀNG ---
+model OrderItem {
+  id        String  @id @default(auto()) @map("_id") @db.ObjectId
+  quantity  Int
+  price     Int     // Lưu lại giá tại thời điểm mua (tránh việc đổi giá sau này làm sai lịch sử)
+  
+  orderId   String  @db.ObjectId
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  productId String  @db.ObjectId
+  product   Product @relation(fields: [productId], references: [id])
+}
+
+// --- BẢNG ĐÁNH GIÁ ---
+model Review {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  rating     Int      // Từ 1 đến 5 sao
+  comment    String?
+  
+  productId  String   @db.ObjectId
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  customerId String   @db.ObjectId
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  
+  createdAt  DateTime @default(now())
+}
