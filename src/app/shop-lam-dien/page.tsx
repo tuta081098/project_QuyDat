@@ -156,7 +156,7 @@ export default function ShopLamDienPage() {
       
       {/* TOAST NOTIFICATION NỔI GÓC DƯỚI PHẢI */}
       {toast.visible && (
-        <div className={`fixed bottom-6 right-6 z-[200] flex items-center gap-3 px-5 py-4 rounded-xl shadow-2xl animate-in slide-in-from-right-8 fade-in text-sm font-bold text-white ${toast.type === 'success' ? 'bg-emerald-600' : 'bg-red-600'}`}>
+        <div className={`fixed top-24 right-6 z-[200] flex items-center gap-3 px-5 py-4 rounded-xl shadow-2xl animate-in slide-in-from-top-8 fade-in text-sm font-bold text-white ${toast.type === 'success' ? 'bg-emerald-600' : 'bg-red-600'}`}>
           {toast.type === 'success' ? <CheckCircle2 className="w-5 h-5"/> : <AlertCircle className="w-5 h-5"/>}
           {toast.message}
         </div>
@@ -165,7 +165,7 @@ export default function ShopLamDienPage() {
       {/* HEADER TỐI ƯU */}
       <header className="bg-white sticky top-0 z-40 border-b border-slate-100 shadow-sm transition-all">
         <div className="bg-teal-950 text-white text-[11px] py-1.5 text-center font-bold tracking-widest uppercase">
-          Miễn phí vận chuyển toàn quốc cho đơn hàng từ 500k
+          ✨ BỘ SƯU TẬP MỚI ĐÃ CHÍNH THỨC LÊN KỆ - ĐỔI TRẢ MIỄN PHÍ TRONG 7 NGÀY
         </div>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-20 flex justify-between items-center">
           
