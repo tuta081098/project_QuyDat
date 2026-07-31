@@ -1,43 +1,88 @@
-import { prisma } from '@/src/lib/prisma';
 import { NextResponse } from 'next/server';
+import { prisma } from '@/src/lib/prisma';
 
-export async function GET(request: Request) {
-    try {
-        const { searchParams } = new URL(request.url);
-        const search = searchParams.get('search') || '';
-        const categoryId = searchParams.get('categoryId') || '';
+const generateSlug = (text: string) => {
+  return text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+};
 
-        const where: any = {
-            status: { not: 'DELETED' },
-            name: { contains: search, mode: 'insensitive' }
-        };
-        if (categoryId) where.categoryId = categoryId;
+export async function GET() {
+  try {
+    // 1. Chỉ lấy thông tin bảng Product, KHÔNG dùng include để tránh crash
+    const products = await prisma.product.findMany({
+      orderBy: { createdAt: 'desc' }
+    });
 
-        const products = await prisma.product.findMany({
-            where,
-            include: { category: true },
-            orderBy: { createdAt: 'desc' }
-        });
-        return NextResponse.json(products);
-    } catch (error) {
-        return NextResponse.json({ error: 'Lỗi lấy danh sách sản phẩm' }, { status: 500 });
-    }
+    // 2. Lấy thông tin tất cả Categories hiện có
+    const categories = await prisma.category.findMany({
+      select: { 
+        id: true, 
+        name: true,
+        parent: { select: { name: true } }
+      }
+    });
+
+    // 3. Tự động map (ghép) category vào từng sản phẩm một cách an toàn
+    const formattedProducts = products.map((product) => {
+      const matchCat = categories.find(c => c.id === product.categoryId);
+      return {
+        ...product,
+        // Nếu không tìm thấy category (bị xoá), trả về chuỗi cảnh báo an toàn
+        category: matchCat ? matchCat : { name: "Danh mục đã xóa", parent: null }
+      };
+    });
+
+    return NextResponse.json(formattedProducts);
+  } catch (error: any) {
+    console.error("Lỗi lấy danh sách sản phẩm:", error);
+    return NextResponse.json({ error: 'Lỗi lấy danh sách sản phẩm' }, { status: 500 });
+  }
 }
 
 export async function POST(request: Request) {
-    try {
-        const body = await request.json();
-        const { name, slug, price, stock, image, categoryId, status } = body;
+  try {
+    const body = await request.json();
+    const { name, slug, price, discountPrice, stock, categoryId, sizes, image, status, description } = body;
 
-        if (!name || !slug || !price || !categoryId) {
-            return NextResponse.json({ error: 'Thiếu thông tin bắt buộc' }, { status: 400 });
-        }
+    const productSlug = slug || generateSlug(name);
 
-        const product = await prisma.product.create({
-            data: { name, slug, price: Number(price), stock: Number(stock || 0), image, categoryId, status: status || 'ACTIVE' }
-        });
-        return NextResponse.json({ success: true, data: product });
-    } catch (error) {
-        return NextResponse.json({ error: 'Lỗi thêm sản phẩm' }, { status: 500 });
+    const existingProduct = await prisma.product.findUnique({
+      where: { slug: productSlug }
+    });
+
+    if (existingProduct) {
+      return NextResponse.json(
+        { error: 'Sản phẩm hoặc đường dẫn này đã tồn tại. Vui lòng đổi tên khác!' },
+        { status: 400 }
+      );
     }
+
+    const product = await prisma.product.create({
+        data: {
+          name,
+          slug: productSlug,
+          price: Number(price) || 0,
+          discountPrice: discountPrice ? Number(discountPrice) : null, // MỚI
+          stock: Number(stock) || 0,
+          sizes: Array.isArray(sizes) ? sizes : [], 
+          image: image || "",
+          status: status || 'ACTIVE',
+          categoryId,
+          description: description || ""
+        }
+      });
+
+    return NextResponse.json({ success: true, data: product });
+  } catch (error: any) {
+    console.error("Lỗi tạo sản phẩm:", error);
+    if (error.code === 'P2002') {
+      return NextResponse.json({ error: 'Sản phẩm này đã tồn tại trong hệ thống.' }, { status: 400 });
+    }
+    return NextResponse.json({ error: error.message || 'Lỗi hệ thống khi tạo sản phẩm' }, { status: 500 });
+  }
 }

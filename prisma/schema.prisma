@@ -88,15 +88,21 @@ model DocHistory {
 
 // --- BẢNG DANH MỤC SẢN PHẨM ---
 model Category {
-  id        String    @id @default(auto()) @map("_id") @db.ObjectId
-  name      String
-  slug      String    @unique
-  status    String    @default("ACTIVE") // ACTIVE, HIDDEN
+  id           String     @id @default(auto()) @map("_id") @db.ObjectId
+  name         String
+  slug         String     @unique
+  status       String     @default("ACTIVE")
+  isHeaderMenu Boolean    @default(false)
   
-  products  Product[] // 1 Danh mục có nhiều Sản phẩm
+  // TẠO PHẢ HỆ: DANH MỤC CHA - CON
+  parentId     String?    @db.ObjectId
+  parent       Category?  @relation("SubCategories", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  children     Category[] @relation("SubCategories")
   
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  products     Product[] 
+  
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
 }
 
 // --- BẢNG SẢN PHẨM ---
@@ -104,19 +110,23 @@ model Product {
   id          String      @id @default(auto()) @map("_id") @db.ObjectId
   name        String
   slug        String      @unique
-  price       Int
-  stock       Int         @default(0)
+  sizes       String[]    // MỚI: Lưu mảng các size hỗ trợ (VD: ["35", "36", "37"])
   image       String?
-  status      String      @default("ACTIVE") // ACTIVE, OUT_OF_STOCK, HIDDEN
+  status      String      @default("ACTIVE") // ACTIVE, OUT_OF_STOCK, DELETED
   
   categoryId  String      @db.ObjectId
   category    Category    @relation(fields: [categoryId], references: [id])
   
-  orderItems  OrderItem[] // Sản phẩm nằm trong nhiều Đơn hàng
-  reviews     Review[]    // Sản phẩm có nhiều Đánh giá
+  orderItems  OrderItem[] 
+  reviews     Review[]    
   
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
+
+  price         Int
+  discountPrice Int?
+  stock         Int         @default(0)
+  description   String?
 }
 
 // --- BẢNG KHÁCH HÀNG ---
@@ -176,4 +186,21 @@ model Review {
   customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
   
   createdAt  DateTime @default(now())
+}
+
+model User {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  email     String   @unique
+  password  String   // Lưu mật khẩu (nên hash bằng bcrypt)
+  name      String
+  phone     String?
+  address   String?
+  role      String   @default("USER") // "USER" hoặc "ADMIN"
+  status    String   @default("ACTIVE") // "ACTIVE" hoặc "BANNED"
+  
+  // Hỗ trợ kiểm tra đăng nhập đa thiết bị (Lưu token phiên)
+  sessionToken String? 
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

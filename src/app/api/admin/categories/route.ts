@@ -1,16 +1,17 @@
-import { prisma } from '@/src/lib/prisma';
 import { NextResponse } from 'next/server';
+import { prisma } from '@/src/lib/prisma';
 
-// LẤY DANH SÁCH DANH MỤC
+const generateSlug = (text: string) => {
+  return text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+};
+
 export async function GET() {
   try {
     const categories = await prisma.category.findMany({
       orderBy: { createdAt: 'desc' },
-      // Lấy kèm số lượng sản phẩm trong mỗi danh mục
       include: {
-        _count: {
-          select: { products: true }
-        }
+        parent: { select: { name: true } },
+        _count: { select: { products: true } }
       }
     });
     return NextResponse.json(categories);
@@ -19,28 +20,49 @@ export async function GET() {
   }
 }
 
-// THÊM MỚI DANH MỤC
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { name, slug, status } = body;
+    const { name, slug, status, headerTab } = body;
 
-    if (!name || !slug) {
-      return NextResponse.json({ error: 'Tên và Slug không được để trống' }, { status: 400 });
-    }
+    let parentId = null;
 
-    // Kiểm tra trùng Slug
-    const existingCategory = await prisma.category.findUnique({ where: { slug } });
-    if (existingCategory) {
-      return NextResponse.json({ error: 'Đường dẫn (Slug) đã tồn tại' }, { status: 400 });
+    // Sửa lỗi MongoDB undefined null: Tìm kiếm theo isHeaderMenu thay vì parentId: null
+    if (headerTab) {
+      let rootCat = await prisma.category.findFirst({
+        where: { 
+          name: headerTab, 
+          isHeaderMenu: true 
+        }
+      });
+
+      if (!rootCat) {
+        rootCat = await prisma.category.create({
+          data: { 
+            name: headerTab, 
+            slug: generateSlug(headerTab), 
+            isHeaderMenu: true, 
+            status: 'ACTIVE' 
+          }
+        });
+      }
+      parentId = rootCat.id;
     }
 
     const category = await prisma.category.create({
-      data: { name, slug, status: status || 'ACTIVE' }
+      data: { 
+        name, 
+        slug: slug || generateSlug(name), 
+        status: status || 'ACTIVE', 
+        parentId, 
+        isHeaderMenu: false 
+      }
     });
 
     return NextResponse.json({ success: true, data: category });
-  } catch (error) {
-    return NextResponse.json({ error: 'Lỗi tạo danh mục' }, { status: 500 });
+  } catch (error: any) {
+    console.error("Lỗi tạo danh mục:", error);
+    // Bắt lỗi chi tiết ra log để dễ debug nếu còn lỗi khác
+    return NextResponse.json({ error: error.message || 'Lỗi tạo danh mục' }, { status: 500 });
   }
 }
