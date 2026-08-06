@@ -107,6 +107,7 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   emailVerified DateTime?
+  cartData      String?   @default("[]")
 }
 
 model Account {
