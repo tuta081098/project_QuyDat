@@ -3,13 +3,20 @@ import { prisma } from '@/src/lib/prisma';
 
 export async function GET() {
   try {
-    const customers = await prisma.customer.findMany({
-      include: {
-        orders: true
-      },
-      orderBy: { createdAt: 'desc' }
+    const users = await prisma.user.findMany({
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        address: true,
+        role: true,
+        status: true,
+        createdAt: true,
+      }
     });
-    return NextResponse.json(customers);
+    return NextResponse.json(users);
   } catch (error) {
     return NextResponse.json({ error: 'Lỗi lấy danh sách khách hàng' }, { status: 500 });
   }

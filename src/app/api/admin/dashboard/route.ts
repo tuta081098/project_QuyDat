@@ -1,33 +1,24 @@
-import { prisma } from '@/src/lib/prisma';
 import { NextResponse } from 'next/server';
+import { prisma } from '@/src/lib/prisma';
 
 export async function GET() {
   try {
-    // Chạy song song các query để tối ưu tốc độ
-    const [
-      totalRevenueAggr,
-      newOrdersCount,
-      customersCount,
-      reviewsCount
-    ] = await Promise.all([
-      prisma.order.aggregate({
-        where: { status: 'COMPLETED' },
-        _sum: { totalAmount: true }
-      }),
-      prisma.order.count({ where: { status: 'PENDING' } }),
-      prisma.customer.count(),
-      prisma.review.count({ where: { rating: 5 } })
-    ]);
+    // 1. Lấy doanh thu từ các đơn hàng ĐÃ GIAO (DELIVERED)
+    const deliveredOrders = await prisma.order.findMany({ where: { status: 'DELIVERED' } });
+    const revenue = deliveredOrders.reduce((sum, order) => sum + order.totalAmount, 0);
 
-    const totalRevenue = totalRevenueAggr._sum.totalAmount || 0;
+    // 2. Thống kê chung
+    const ordersCount = await prisma.order.count();
+    const customersCount = await prisma.user.count({ where: { role: 'USER' } });
+    const outOfStockProducts = await prisma.product.count({ where: { stock: { lte: 0 } } });
 
     return NextResponse.json({
-      revenue: totalRevenue,
-      orders: newOrdersCount,
+      revenue,
+      orders: ordersCount,
       customers: customersCount,
-      fiveStarReviews: reviewsCount
+      outOfStockProducts
     });
   } catch (error) {
-    return NextResponse.json({ error: 'Lỗi Server' }, { status: 500 });
+    return NextResponse.json({ error: 'Lỗi lấy thống kê Dashboard' }, { status: 500 });
   }
 }
