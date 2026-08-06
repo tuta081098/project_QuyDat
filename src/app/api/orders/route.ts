@@ -4,14 +4,13 @@ import { prisma } from '@/src/lib/prisma';
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { customerName, customerEmail, customerPhone, address, totalAmount, paymentMethod, items } = body;
+    const { customerName, customerEmail, customerPhone, address, totalAmount, paymentMethod, paymentStatus, items } = body;
 
-    // Sử dụng Transaction: Đảm bảo cả 2 việc Tạo đơn và Trừ kho đều thành công cùng lúc
     const order = await prisma.$transaction(async (tx) => {
-      // 1. Tạo đơn hàng
+      // 1. Tạo đơn hàng (Đã bổ sung paymentStatus)
       const newOrder = await tx.order.create({
         data: {
-          customerName, customerEmail, customerPhone, address, totalAmount, paymentMethod,
+          customerName, customerEmail, customerPhone, address, totalAmount, paymentMethod, paymentStatus,
           items: {
             create: items.map((item: any) => ({
               productId: item.productId,
@@ -24,7 +23,7 @@ export async function POST(request: Request) {
         }
       });
 
-      // 2. Trừ số lượng tồn kho của các sản phẩm khách vừa mua
+      // 2. Trừ số lượng tồn kho
       for (const item of items) {
         await tx.product.update({
           where: { id: item.productId },

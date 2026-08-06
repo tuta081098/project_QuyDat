@@ -184,6 +184,7 @@ model Order {
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
   paymentMethod String      @default("COD") // COD, ONLINE
+  paymentStatus String      @default("PENDING")
 }
 
 // --- BẢNG CHI TIẾT ĐƠN HÀNG ---
