@@ -6,7 +6,7 @@ export async function GET() {
     const reviews = await prisma.review.findMany({
       include: {
         product: true,
-        customer: true
+        user: true
       },
       orderBy: { createdAt: 'desc' }
     });
