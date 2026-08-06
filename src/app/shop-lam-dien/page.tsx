@@ -759,7 +759,7 @@ export default function ShopLamDienPage() {
            <div>
              <h4 className="font-black text-white uppercase tracking-wider mb-5">Liên hệ</h4>
              <ul className="space-y-3 font-medium text-slate-400">
-               <li className="flex items-center gap-3"><Phone className="w-4 h-4 text-teal-500"/> 1900 1000</li>
+               <li className="flex items-center gap-3"><Phone className="w-4 h-4 text-teal-500"/> 1900 1111</li>
                <li className="flex items-start gap-3"><MapPin className="w-4 h-4 text-teal-500 shrink-0"/> 228 Đ. Cầu Giấy, Quan Hoa, Hà Nội</li>
              </ul>
            </div>
