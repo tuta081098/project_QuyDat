@@ -47,9 +47,14 @@ export default function ShopLamDienPage() {
 
   const [isTrackModalOpen, setIsTrackModalOpen] = useState(false);
   const [trackPhone, setTrackPhone] = useState("");
+  
+  // --- CÁC STATE CHỐNG DOUBLE CLICK (LOADING SPINNER) ---
   const [isTracking, setIsTracking] = useState(false);
-  const [trackResults, setTrackResults] = useState<any[] | null>(null);
+  const [isAuthSubmitting, setIsAuthSubmitting] = useState(false);
+  const [isProfileSubmitting, setIsProfileSubmitting] = useState(false);
+  const [isCheckoutSubmitting, setIsCheckoutSubmitting] = useState(false);
 
+  const [trackResults, setTrackResults] = useState<any[] | null>(null);
   const [toast, setToast] = useState<{ message: string, type: 'success' | 'error', visible: boolean }>({ message: "", type: "success", visible: false });
 
   const showToast = (message: string, type: 'success' | 'error') => {
@@ -67,7 +72,6 @@ export default function ShopLamDienPage() {
         
         let loggedInUser = null;
         const session = await getSession();
-        
         const userEmail = session?.user?.email || (localStorage.getItem("lamdien_user") ? JSON.parse(localStorage.getItem("lamdien_user")!).email : null);
 
         if (userEmail) {
@@ -92,7 +96,6 @@ export default function ShopLamDienPage() {
           const savedCart = localStorage.getItem("lamdien_cart");
           if (savedCart) setCart(JSON.parse(savedCart));
         }
-
       } catch (error) { console.error(error); } finally { setIsLoading(false); }
     };
     loadShopData();
@@ -105,8 +108,10 @@ export default function ShopLamDienPage() {
     setAuthError(""); 
     if (!isLoginMode) {
       const phoneRegex = /(84|0[3|5|7|8|9])+([0-9]{8})\b/;
-      if (!phoneRegex.test(authForm.phone)) return setAuthError("Số điện thoại không hợp lệ (Gồm 10 số, đầu số chuẩn VN).");
+      if (!phoneRegex.test(authForm.phone)) return setAuthError("Số điện thoại không hợp lệ.");
     }
+    
+    setIsAuthSubmitting(true); // BẬT LOADING
     try {
       const res = await fetch(isLoginMode ? '/api/auth/login' : '/api/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(authForm) });
       const data = await res.json();
@@ -117,7 +122,11 @@ export default function ShopLamDienPage() {
       setIsAuthModalOpen(false);
       setAuthForm({ name: "", email: "", phone: "", password: "" }); 
       showToast(isLoginMode ? "Đăng nhập thành công!" : "Đăng ký thành công!", "success");
-    } catch (err) { setAuthError("Lỗi kết nối đến máy chủ."); }
+    } catch (err) { 
+      setAuthError("Lỗi kết nối đến máy chủ."); 
+    } finally {
+      setIsAuthSubmitting(false); // TẮT LOADING
+    }
   };
 
   const handleLogout = async () => { 
@@ -132,6 +141,7 @@ export default function ShopLamDienPage() {
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsProfileSubmitting(true); // BẬT LOADING
     try {
       const res = await fetch('/api/auth/me', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: currentUser.id, ...profileForm }) });
       const data = await res.json();
@@ -142,7 +152,11 @@ export default function ShopLamDienPage() {
         setIsProfileModalOpen(false);
         showToast("Cập nhật thông tin thành công!", "success");
       } else { showToast(data.error || "Cập nhật thất bại", "error"); }
-    } catch (err) { showToast("Lỗi kết nối.", "error"); }
+    } catch (err) { 
+      showToast("Lỗi kết nối.", "error"); 
+    } finally {
+      setIsProfileSubmitting(false); // TẮT LOADING
+    }
   };
 
   const openProfile = () => {
@@ -153,13 +167,12 @@ export default function ShopLamDienPage() {
   const saveCart = (newCart: any[]) => { 
     setCart(newCart); 
     localStorage.setItem("lamdien_cart", JSON.stringify(newCart)); 
-    
     if (currentUser && currentUser.id) {
        fetch('/api/auth/me', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ id: currentUser.id, cartData: JSON.stringify(newCart) })
-       }).catch(err => console.error("Lỗi đồng bộ giỏ hàng", err));
+       }).catch(err => console.error(err));
     }
   };
 
@@ -221,9 +234,10 @@ export default function ShopLamDienPage() {
   const handleCheckoutSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const phoneRegex = /(84|0[3|5|7|8|9])+([0-9]{8})\b/;
-    if (!phoneRegex.test(checkoutForm.customerPhone)) return showToast("Số điện thoại không hợp lệ (Phải là 10 số chuẩn VN).", "error");
+    if (!phoneRegex.test(checkoutForm.customerPhone)) return showToast("Số điện thoại không hợp lệ.", "error");
     const finalPaymentStatus = (checkoutForm.paymentMethod === 'QR' && isQrPaid) ? 'PAID' : 'PENDING';
 
+    setIsCheckoutSubmitting(true); // BẬT LOADING
     try {
       const orderData = { ...checkoutForm, totalAmount: cartTotal, paymentStatus: finalPaymentStatus, items: cart };
       const res = await fetch('/api/orders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(orderData) });
@@ -234,7 +248,11 @@ export default function ShopLamDienPage() {
         const prodRes = await fetch("/api/admin/products");
         if (prodRes.ok) setProducts((await prodRes.json()).filter((p: any) => p.status !== "DELETED"));
       } else { showToast("Có lỗi xảy ra hoặc sản phẩm vừa hết hàng.", "error"); }
-    } catch (err) { showToast("Lỗi kết nối.", "error"); }
+    } catch (err) { 
+      showToast("Lỗi kết nối.", "error"); 
+    } finally {
+      setIsCheckoutSubmitting(false); // TẮT LOADING
+    }
   };
 
   const handleTrackOrderSubmit = async (e: React.FormEvent) => {
@@ -280,7 +298,6 @@ export default function ShopLamDienPage() {
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-slate-900 font-sans selection:bg-teal-200">
       
-      {/* THÔNG BÁO TOAST */}
       {toast.visible && (
         <div className={`fixed top-24 right-6 z-[9999] flex items-center gap-3 px-5 py-4 rounded-xl shadow-2xl animate-in slide-in-from-top-8 fade-in text-sm font-bold text-white ${toast.type === 'success' ? 'bg-emerald-600' : 'bg-red-600'}`}>
           {toast.type === 'success' ? <CheckCircle2 className="w-5 h-5"/> : <AlertCircle className="w-5 h-5"/>} {toast.message}
@@ -571,7 +588,7 @@ export default function ShopLamDienPage() {
               )}
 
               <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap mb-6 bg-slate-50 p-5 rounded-2xl border-none">
-                {selectedProduct.description || "Chưa có mô tả chi tiết. Thiết kế biểu tượng của Lam Điền, kết hợp vật liệu bảo vệ môi trường."}
+                {selectedProduct.description || "Chưa có mô tả chi tiết."}
               </p>
 
               <div className="mb-6">
@@ -702,10 +719,10 @@ export default function ShopLamDienPage() {
               
               <button 
                 type="submit" 
-                disabled={checkoutForm.paymentMethod === 'QR' && !isQrPaid}
-                className="w-full py-4 mt-4 bg-slate-900 hover:bg-teal-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-black rounded-xl uppercase transition-colors shadow-lg shadow-slate-900/20 tracking-widest"
+                disabled={(checkoutForm.paymentMethod === 'QR' && !isQrPaid) || isCheckoutSubmitting}
+                className="w-full py-4 mt-4 bg-slate-900 hover:bg-teal-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-black rounded-xl uppercase transition-colors shadow-lg shadow-slate-900/20 tracking-widest flex items-center justify-center gap-2"
               >
-                {checkoutForm.paymentMethod === 'QR' && !isQrPaid ? 'Vui lòng thanh toán QR để tiếp tục' : 'Hoàn Tất Đặt Hàng'}
+                {isCheckoutSubmitting ? <Loader2 className="w-5 h-5 animate-spin"/> : (checkoutForm.paymentMethod === 'QR' && !isQrPaid ? 'Vui lòng thanh toán QR để tiếp tục' : 'Hoàn Tất Đặt Hàng')}
               </button>
             </form>
           </div>
@@ -748,8 +765,8 @@ export default function ShopLamDienPage() {
                   <input type="password" required value={authForm.password} onChange={e => setAuthForm({...authForm, password: e.target.value})} className="w-full px-4 py-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white outline-none focus:border-teal-600 transition-colors font-medium" placeholder="••••••••" />
                 </div>
 
-                <button type="submit" className="w-full py-4 mt-2 bg-slate-900 hover:bg-teal-700 text-white font-black rounded-xl uppercase transition-colors shadow-lg shadow-slate-900/20 tracking-widest">
-                  {isLoginMode ? 'Đăng nhập ngay' : 'Đăng ký tài khoản'}
+                <button type="submit" disabled={isAuthSubmitting} className="w-full py-4 mt-2 bg-slate-900 hover:bg-teal-700 disabled:bg-slate-300 text-white font-black rounded-xl uppercase transition-colors shadow-lg shadow-slate-900/20 tracking-widest flex items-center justify-center gap-2">
+                  {isAuthSubmitting ? <Loader2 className="w-5 h-5 animate-spin"/> : (isLoginMode ? 'Đăng nhập ngay' : 'Đăng ký tài khoản')}
                 </button>
               </form>
 
@@ -789,13 +806,15 @@ export default function ShopLamDienPage() {
                 <form onSubmit={handleUpdateProfile} className="text-left space-y-4 mb-8">
                   <div>
                     <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Số điện thoại</label>
-                    <input type="tel" value={profileForm.phone} onChange={e => setProfileForm({...profileForm, phone: e.target.value})} className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium focus:border-teal-600 outline-none transition-colors" />
+                    <input type="tel" required value={profileForm.phone} onChange={e => setProfileForm({...profileForm, phone: e.target.value})} className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium focus:border-teal-600 outline-none transition-colors" />
                   </div>
                   <div>
                     <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Địa chỉ</label>
-                    <textarea value={profileForm.address} onChange={e => setProfileForm({...profileForm, address: e.target.value})} className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium focus:border-teal-600 outline-none transition-colors" rows={2} />
+                    <textarea required value={profileForm.address} onChange={e => setProfileForm({...profileForm, address: e.target.value})} className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium focus:border-teal-600 outline-none transition-colors" rows={2} />
                   </div>
-                  <button type="submit" className="w-full py-3.5 bg-teal-700 hover:bg-teal-800 text-white font-black tracking-widest uppercase rounded-xl text-xs transition-colors shadow-md">Lưu Thông Tin</button>
+                  <button type="submit" disabled={isProfileSubmitting} className="w-full py-3.5 bg-teal-700 hover:bg-teal-800 disabled:bg-slate-300 text-white font-black tracking-widest uppercase rounded-xl text-xs transition-colors shadow-md flex justify-center items-center gap-2">
+                    {isProfileSubmitting ? <Loader2 className="w-4 h-4 animate-spin"/> : 'Lưu Thông Tin'}
+                  </button>
                 </form>
 
                 <button onClick={handleLogout} className="w-full py-3.5 bg-red-50 hover:bg-red-100 text-red-600 font-black rounded-xl uppercase tracking-widest text-xs transition-colors flex items-center justify-center gap-2">
