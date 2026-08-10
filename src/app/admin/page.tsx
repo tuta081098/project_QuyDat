@@ -37,15 +37,15 @@ export default function AdminDashboardPage() {
   const [isCatModalOpen, setIsCatModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<any>(null);
   const [catForm, setCatForm] = useState({ name: "", slug: "", status: "ACTIVE", headerTab: "NAM" });
-  
+
   // STATE CHỐNG SPAM CATEGORY
-  const [isSubmittingCat, setIsSubmittingCat] = useState(false); 
+  const [isSubmittingCat, setIsSubmittingCat] = useState(false);
 
   // --- STATE PRODUCT ---
   const [isProdModalOpen, setIsProdModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any>(null);
   const [prodForm, setProdForm] = useState({ name: "", slug: "", price: "", discountPrice: "", stock: "", categoryId: "", status: "ACTIVE", image: "", sizes: "", description: "" });
-  
+
   // STATE CHỐNG SPAM PRODUCT
   const [isSubmittingProd, setIsSubmittingProd] = useState(false);
 
@@ -124,14 +124,14 @@ export default function AdminDashboardPage() {
   const handleCategorySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmittingCat(true); // BẬT LOADING
-    
+
     try {
       const url = editingCategory ? `/api/admin/categories/${editingCategory.id}` : '/api/admin/categories';
       const method = editingCategory ? 'PATCH' : 'POST';
       const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(catForm) });
-      if (res.ok) { 
-        setIsCatModalOpen(false); 
-        loadTabContextData(); 
+      if (res.ok) {
+        setIsCatModalOpen(false);
+        loadTabContextData();
         showToast(editingCategory ? "Cập nhật danh mục thành công!" : "Thêm danh mục thành công!", "success");
       } else {
         const err = await res.json();
@@ -163,14 +163,20 @@ export default function AdminDashboardPage() {
     setIsUploadingImage(true);
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('upload_preset', 'lamdien_shop'); 
+    formData.append('upload_preset', 'lamdien_shop');
+
+    const uploadUrl = process.env.NEXT_PUBLIC_CLOUDINARY_URL;
+
+    if (!uploadUrl) {
+      throw new Error("Chưa cấu hình NEXT_PUBLIC_CLOUDINARY_URL trong biến môi trường.");
+    }
 
     try {
-      const res = await fetch('https://api.cloudinary.com/v1_1/YOUR_CLOUD_NAME/image/upload', {
+      const res = await fetch(uploadUrl, {
         method: 'POST',
         body: formData
       });
-      
+
       const data = await res.json();
       if (data.secure_url) {
         setProdForm({ ...prodForm, image: data.secure_url });
@@ -190,7 +196,7 @@ export default function AdminDashboardPage() {
         name: prod.name,
         slug: prod.slug,
         price: String(prod.price),
-        discountPrice: prod.discountPrice ? String(prod.discountPrice) : "", 
+        discountPrice: prod.discountPrice ? String(prod.discountPrice) : "",
         stock: String(prod.stock),
         categoryId: prod.categoryId,
         status: prod.status,
@@ -221,8 +227,8 @@ export default function AdminDashboardPage() {
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          ...prodForm, 
+        body: JSON.stringify({
+          ...prodForm,
           sizes: sizesArray,
           price: Number(prodForm.price),
           discountPrice: prodForm.discountPrice ? Number(prodForm.discountPrice) : null,
@@ -319,7 +325,7 @@ export default function AdminDashboardPage() {
                 <tbody className="divide-y divide-slate-100">
                   {products.filter(p => filterSearch(p.name)).map(prod => (
                     <tr key={prod.id} className="hover:bg-slate-50/50">
-                      <td className="px-6 py-4"><img src={prod.image || "https://via.placeholder.com/50"} alt={prod.name} className="w-12 h-12 object-contain bg-slate-50 rounded-lg"/></td>
+                      <td className="px-6 py-4"><img src={prod.image || "https://via.placeholder.com/50"} alt={prod.name} className="w-12 h-12 object-contain bg-slate-50 rounded-lg" /></td>
                       <td className="px-6 py-4 font-bold text-slate-800">{prod.name}</td>
                       <td className="px-6 py-4 text-slate-500 font-semibold">{prod.category?.name}</td>
                       <td className="px-6 py-4">
@@ -456,7 +462,7 @@ export default function AdminDashboardPage() {
                           value={order.status}
                           onChange={(e) => updateOrderStatus(order.id, e.target.value)}
                           className={`px-3 py-1.5 rounded-lg text-xs font-bold outline-none cursor-pointer ${order.status === 'PENDING' ? 'bg-amber-100 text-amber-700' :
-                              order.status === 'DELIVERED' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700'
+                            order.status === 'DELIVERED' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700'
                             }`}
                         >
                           <option value="PENDING">Chờ xử lý</option>
@@ -509,10 +515,10 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 flex font-sans relative">
-      
+
       {toast.visible && (
         <div className={`fixed top-6 right-6 z-[9999] flex items-center gap-3 px-5 py-4 rounded-xl shadow-2xl animate-in slide-in-from-top-4 fade-in text-sm font-bold text-white ${toast.type === 'success' ? 'bg-emerald-600' : 'bg-red-600'}`}>
-          {toast.type === 'success' ? <CheckCircle2 className="w-5 h-5"/> : <AlertCircle className="w-5 h-5"/>} {toast.message}
+          {toast.type === 'success' ? <CheckCircle2 className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />} {toast.message}
         </div>
       )}
 
@@ -545,7 +551,7 @@ export default function AdminDashboardPage() {
             <input type="text" value={globalSearch} onChange={(e) => setGlobalSearch(e.target.value)} placeholder="Tìm kiếm..." className="w-full pl-11 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:outline-none focus:border-teal-500 font-medium" />
             <Search className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
           </div>
-          <a href="/shop-lam-dien" className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg text-sm flex items-center gap-2"><LogOut className="w-4 h-4"/> Về trang Shop</a>
+          <a href="/shop-lam-dien" className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg text-sm flex items-center gap-2"><LogOut className="w-4 h-4" /> Về trang Shop</a>
         </header>
 
         <div className="flex-1 p-8 overflow-y-auto">
@@ -582,7 +588,7 @@ export default function AdminDashboardPage() {
               <div className="pt-4 flex gap-3">
                 <button type="button" onClick={() => setIsCatModalOpen(false)} className="flex-1 py-3 text-sm font-bold text-slate-500 bg-slate-100 rounded-xl">Hủy</button>
                 <button type="submit" disabled={isSubmittingCat} className="flex-[2] py-3 text-sm font-bold text-white bg-teal-600 hover:bg-teal-700 rounded-xl disabled:bg-teal-300 flex items-center justify-center gap-2">
-                  {isSubmittingCat ? <Loader2 className="w-4 h-4 animate-spin"/> : 'Lưu dữ liệu'}
+                  {isSubmittingCat ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Lưu dữ liệu'}
                 </button>
               </div>
             </form>
@@ -599,7 +605,7 @@ export default function AdminDashboardPage() {
               <button onClick={() => setIsProdModalOpen(false)} className="p-1.5 hover:bg-slate-200 rounded-full"><X className="w-4 h-4" /></button>
             </div>
             <form onSubmit={handleProductSubmit} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto grid grid-cols-2 gap-x-4 gap-y-1">
-              
+
               <div className="col-span-2">
                 <label className="text-xs font-bold text-slate-400 uppercase block mb-1">Hình ảnh sản phẩm</label>
                 <div className="flex items-center gap-4">
@@ -608,7 +614,7 @@ export default function AdminDashboardPage() {
                     {isUploadingImage && <p className="text-xs text-teal-600 mt-2 font-bold animate-pulse">Đang xử lý và tải ảnh lên mây...</p>}
                   </div>
                   <div className="w-20 h-20 bg-slate-100 rounded-lg border border-slate-200 overflow-hidden flex-shrink-0 flex items-center justify-center">
-                    {prodForm.image ? ( <img src={prodForm.image} alt="Preview" className="w-full h-full object-cover" /> ) : ( <span className="text-[10px] text-slate-400 text-center font-bold">Chưa có<br/>ảnh</span> )}
+                    {prodForm.image ? (<img src={prodForm.image} alt="Preview" className="w-full h-full object-cover" />) : (<span className="text-[10px] text-slate-400 text-center font-bold">Chưa có<br />ảnh</span>)}
                   </div>
                 </div>
               </div>
@@ -658,7 +664,7 @@ export default function AdminDashboardPage() {
               <div className="col-span-2 pt-4 flex gap-3">
                 <button type="button" onClick={() => setIsProdModalOpen(false)} className="flex-1 py-3 text-sm font-bold text-slate-500 bg-slate-100 rounded-xl">Hủy</button>
                 <button type="submit" disabled={isSubmittingProd} className="flex-[2] py-3 text-sm font-bold text-white bg-teal-600 hover:bg-teal-700 disabled:bg-teal-300 rounded-xl flex justify-center items-center gap-2">
-                  {isSubmittingProd ? <Loader2 className="w-4 h-4 animate-spin"/> : 'Lưu dữ liệu'}
+                  {isSubmittingProd ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Lưu dữ liệu'}
                 </button>
               </div>
             </form>
