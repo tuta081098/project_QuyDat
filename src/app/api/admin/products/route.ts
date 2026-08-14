@@ -4,11 +4,14 @@ import { prisma } from '@/src/lib/prisma';
 export async function GET() {
   try {
     const products = await prisma.product.findMany({
-      // BỔ SUNG ĐIỀU KIỆN LỌC NÀY: CHỈ LẤY SẢN PHẨM KHÁC "DELETED"
+      // BỔ SUNG ĐIỀU KIỆN NÀY: CHỈ LẤY SẢN PHẨM KHÁC "DELETED"
       where: { 
         status: { not: 'DELETED' } 
       },
-      include: { category: { include: { parent: true } } },
+      include: { 
+        category: { include: { parent: true } },
+        reviews: { include: { user: true }, orderBy: { createdAt: 'desc' } }
+      },
       orderBy: { createdAt: 'desc' }
     });
     return NextResponse.json(products);

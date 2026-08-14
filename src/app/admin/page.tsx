@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import {
   LayoutDashboard, List, Package, ShoppingCart, Users, Star, Settings,
-  Search, Bell, LogOut, Plus, Edit3, Trash2, Eye, CheckCircle, DollarSign, Loader2, X, CheckCircle2, AlertCircle
+  Search, Bell, LogOut, Plus, Edit3, Trash2, Eye, CheckCircle, DollarSign, Loader2, X, CheckCircle2, AlertCircle,
+  TrendingUp, Clock, AlertTriangle, ChevronRight, MessageSquare
 } from "lucide-react";
 
 const HEADER_TABS = ['NAM', 'NỮ', 'TRẺ EM', 'PHỤ KIỆN', 'BỘ SƯU TẬP', 'GIẢM GIÁ'];
@@ -262,6 +263,17 @@ export default function AdminDashboardPage() {
     }
   };
 
+  const deleteReview = async (id: string) => {
+    if (!window.confirm("Bạn có chắc chắn muốn xóa đánh giá này?")) return;
+    const res = await fetch(`/api/admin/reviews/${id}`, { method: 'DELETE' });
+    if (res.ok) {
+      loadTabContextData();
+      showToast("Đã xóa đánh giá!", "success");
+    } else {
+      showToast("Lỗi khi xóa đánh giá", "error");
+    }
+  };
+
   const filterSearch = (text: string) => text.toLowerCase().includes(globalSearch.toLowerCase());
 
   const renderContent = () => {
@@ -354,25 +366,159 @@ export default function AdminDashboardPage() {
       case "DASHBOARD":
         return (
           <div className="space-y-6">
-            <h2 className="text-2xl font-bold text-slate-800">Tổng quan hệ thống</h2>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div className="flex justify-between items-center">
+              <h2 className="text-2xl font-bold text-slate-800">Tổng quan hệ thống</h2>
+              <p className="text-sm font-semibold text-slate-400">{new Date().toLocaleDateString('vi-VN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+            </div>
+
+            {/* === STAT CARDS === */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
               {[
-                { label: "Doanh thu (Đã giao)", value: formatVND(stats.revenue || 0), icon: DollarSign, color: "text-emerald-600", bg: "bg-emerald-50" },
-                { label: "Tổng Đơn hàng", value: stats.orders || 0, icon: ShoppingCart, color: "text-blue-600", bg: "bg-blue-50" },
-                { label: "Khách hàng", value: stats.customers || 0, icon: Users, color: "text-indigo-600", bg: "bg-indigo-50" },
-                { label: "SP Hết hàng", value: stats.outOfStockProducts || 0, icon: Package, color: "text-red-600", bg: "bg-red-50" }
+                { label: "Doanh thu (Đã giao)", value: formatVND(stats.revenue || 0), sub: `Hôm nay: ${formatVND(stats.todayRevenue || 0)}`, icon: DollarSign, color: "text-emerald-600", bg: "bg-emerald-50", ring: "ring-emerald-100" },
+                { label: "Tổng Đơn hàng", value: stats.orders || 0, sub: `${stats.ordersByStatus?.pending || 0} đang chờ xử lý`, icon: ShoppingCart, color: "text-blue-600", bg: "bg-blue-50", ring: "ring-blue-100" },
+                { label: "Khách hàng", value: stats.customers || 0, sub: `${stats.reviewsCount || 0} đánh giá`, icon: Users, color: "text-indigo-600", bg: "bg-indigo-50", ring: "ring-indigo-100" },
+                { label: "SP Hết hàng", value: stats.outOfStockProducts || 0, sub: `${stats.productsCount || 0} sản phẩm`, icon: Package, color: "text-red-600", bg: "bg-red-50", ring: "ring-red-100" }
               ].map((stat, idx) => {
                 const Icon = stat.icon;
                 return (
-                  <div key={idx} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4">
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${stat.bg} ${stat.color}`}>
-                      <Icon className="w-6 h-6" />
+                  <div key={idx} className={`bg-white p-6 rounded-2xl border border-slate-100 shadow-sm ring-1 ${stat.ring}`}>
+                    <div className="flex items-center justify-between mb-4">
+                      <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${stat.bg} ${stat.color}`}>
+                        <Icon className="w-5 h-5" />
+                      </div>
                     </div>
-                    <div><p className="text-xs font-bold text-slate-400 uppercase tracking-wider">{stat.label}</p><h3 className="text-2xl font-black text-slate-800 mt-1">{stat.value}</h3></div>
+                    <h3 className="text-2xl font-black text-slate-800">{stat.value}</h3>
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mt-1">{stat.label}</p>
+                    {stat.sub && <p className="text-[11px] font-semibold text-slate-500 mt-2 flex items-center gap-1"><TrendingUp className="w-3 h-3" />{stat.sub}</p>}
                   </div>
                 );
               })}
             </div>
+
+            {/* === TRẠNG THÁI ĐƠN HÀNG + QUICK ACTIONS === */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+              {/* Order status breakdown */}
+              <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
+                <h3 className="font-bold text-slate-800 mb-5 flex items-center gap-2"><ShoppingCart className="w-4 h-4 text-teal-600" /> Phân bổ trạng thái đơn hàng</h3>
+                <div className="grid grid-cols-4 gap-3">
+                  {[
+                    { label: "Chờ xử lý", value: stats.ordersByStatus?.pending || 0, color: "bg-amber-500", textColor: "text-amber-700", bgLight: "bg-amber-50" },
+                    { label: "Đang giao", value: stats.ordersByStatus?.shipping || 0, color: "bg-blue-500", textColor: "text-blue-700", bgLight: "bg-blue-50" },
+                    { label: "Đã giao", value: stats.ordersByStatus?.delivered || 0, color: "bg-emerald-500", textColor: "text-emerald-700", bgLight: "bg-emerald-50" },
+                    { label: "Đã hủy", value: stats.ordersByStatus?.cancelled || 0, color: "bg-red-500", textColor: "text-red-700", bgLight: "bg-red-50" }
+                  ].map((s, i) => (
+                    <div key={i} className={`${s.bgLight} rounded-xl p-4 text-center`}>
+                      <p className={`text-2xl font-black ${s.textColor}`}>{s.value}</p>
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mt-1">{s.label}</p>
+                      <div className={`h-1.5 rounded-full mt-3 ${s.color} opacity-30`}>
+                        <div className={`h-full rounded-full ${s.color}`} style={{ width: `${stats.orders ? Math.round((s.value / stats.orders) * 100) : 0}%` }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Quick Actions */}
+              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
+                <h3 className="font-bold text-slate-800 mb-5 flex items-center gap-2"><Settings className="w-4 h-4 text-teal-600" /> Truy cập nhanh</h3>
+                <div className="space-y-2.5">
+                  {[
+                    { label: "Thêm sản phẩm mới", icon: Plus, action: () => { setActiveTab("PRODUCTS"); setTimeout(() => openProductModal(), 100); } },
+                    { label: "Quản lý đơn hàng", icon: ShoppingCart, action: () => setActiveTab("ORDERS") },
+                    { label: "Xem đánh giá", icon: Star, action: () => setActiveTab("REVIEWS") },
+                    { label: "Quản lý danh mục", icon: List, action: () => setActiveTab("CATEGORIES") },
+                    { label: "Danh sách khách hàng", icon: Users, action: () => setActiveTab("CUSTOMERS") }
+                  ].map((item, i) => {
+                    const Icon = item.icon;
+                    return (
+                      <button key={i} onClick={item.action} className="w-full flex items-center justify-between px-4 py-3 bg-slate-50 hover:bg-teal-50 rounded-xl transition-colors group">
+                        <span className="flex items-center gap-3 text-sm font-bold text-slate-700 group-hover:text-teal-700"><Icon className="w-4 h-4 text-slate-400 group-hover:text-teal-600" />{item.label}</span>
+                        <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-teal-500" />
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* === RECENT ORDERS + RECENT REVIEWS === */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+              {/* Recent Orders */}
+              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+                <div className="p-5 border-b border-slate-100 flex justify-between items-center">
+                  <h3 className="font-bold text-slate-800 flex items-center gap-2"><Clock className="w-4 h-4 text-teal-600" /> Đơn hàng gần đây</h3>
+                  <button onClick={() => setActiveTab("ORDERS")} className="text-xs font-bold text-teal-600 hover:text-teal-800 flex items-center gap-1">Xem tất cả <ChevronRight className="w-3 h-3" /></button>
+                </div>
+                <div className="divide-y divide-slate-50">
+                  {stats.recentOrders && stats.recentOrders.length > 0 ? stats.recentOrders.map((order: any) => (
+                    <div key={order.id} className="px-5 py-3.5 flex items-center justify-between hover:bg-slate-50/50 transition-colors">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-slate-800 truncate">{order.customerName}</p>
+                        <p className="text-[11px] text-slate-400 mt-0.5">{new Date(order.createdAt).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })} · {order.items?.length || 0} sản phẩm</p>
+                      </div>
+                      <div className="text-right ml-4 flex-shrink-0">
+                        <p className="text-sm font-black text-teal-700">{formatVND(order.totalAmount)}</p>
+                        <span className={`inline-block mt-1 px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider ${
+                          order.status === 'PENDING' ? 'bg-amber-100 text-amber-700' :
+                          order.status === 'DELIVERED' ? 'bg-emerald-100 text-emerald-700' :
+                          order.status === 'CANCELLED' ? 'bg-red-100 text-red-700' :
+                          'bg-blue-100 text-blue-700'
+                        }`}>{order.status === 'PENDING' ? 'Chờ xử lý' : order.status === 'DELIVERED' ? 'Đã giao' : order.status === 'CANCELLED' ? 'Đã hủy' : 'Đang giao'}</span>
+                      </div>
+                    </div>
+                  )) : (
+                    <div className="px-5 py-8 text-center text-slate-400 text-sm">Chưa có đơn hàng nào.</div>
+                  )}
+                </div>
+              </div>
+
+              {/* Recent Reviews */}
+              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+                <div className="p-5 border-b border-slate-100 flex justify-between items-center">
+                  <h3 className="font-bold text-slate-800 flex items-center gap-2"><MessageSquare className="w-4 h-4 text-teal-600" /> Đánh giá gần đây</h3>
+                  <button onClick={() => setActiveTab("REVIEWS")} className="text-xs font-bold text-teal-600 hover:text-teal-800 flex items-center gap-1">Xem tất cả <ChevronRight className="w-3 h-3" /></button>
+                </div>
+                <div className="divide-y divide-slate-50">
+                  {stats.recentReviews && stats.recentReviews.length > 0 ? stats.recentReviews.map((rev: any) => (
+                    <div key={rev.id} className="px-5 py-3.5 hover:bg-slate-50/50 transition-colors">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-bold text-slate-800">{rev.user?.name || 'Ẩn danh'}</p>
+                        <div className="flex gap-0.5">
+                          {[1,2,3,4,5].map(s => <Star key={s} className={`w-3 h-3 ${rev.rating >= s ? 'fill-amber-400 text-amber-400' : 'text-slate-200'}`} />)}
+                        </div>
+                      </div>
+                      <p className="text-xs text-teal-700 font-semibold mt-0.5">{rev.product?.name || 'SP đã xóa'}</p>
+                      {rev.comment && <p className="text-[11px] text-slate-500 mt-1 line-clamp-1">{rev.comment}</p>}
+                    </div>
+                  )) : (
+                    <div className="px-5 py-8 text-center text-slate-400 text-sm">Chưa có đánh giá nào.</div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* === CẢNH BÁO SẮP HẾT HÀNG === */}
+            {stats.lowStockProducts && stats.lowStockProducts.length > 0 && (
+              <div className="bg-white rounded-2xl border border-amber-200 shadow-sm overflow-hidden">
+                <div className="p-5 border-b border-amber-100 bg-amber-50/50 flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-600" />
+                  <h3 className="font-bold text-amber-800">Sản phẩm sắp hết hàng</h3>
+                </div>
+                <div className="divide-y divide-slate-50">
+                  {stats.lowStockProducts.map((prod: any) => (
+                    <div key={prod.id} className="px-5 py-3 flex items-center justify-between hover:bg-amber-50/30 transition-colors">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-slate-100 rounded-lg overflow-hidden flex-shrink-0">
+                          {prod.image ? <img src={prod.image} alt={prod.name} className="w-full h-full object-cover" /> : <Package className="w-5 h-5 text-slate-300 m-auto mt-2.5" />}
+                        </div>
+                        <span className="text-sm font-bold text-slate-800">{prod.name}</span>
+                      </div>
+                      <span className="px-2.5 py-1 bg-amber-100 text-amber-700 rounded-lg text-xs font-black">Còn {prod.stock} SP</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         );
 
@@ -486,11 +632,11 @@ export default function AdminDashboardPage() {
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
               <table className="w-full text-left text-sm">
                 <thead className="bg-slate-50 text-slate-500 text-[10px] font-black uppercase tracking-wider">
-                  <tr><th className="px-6 py-4">Khách hàng</th><th className="px-6 py-4">Sản phẩm</th><th className="px-6 py-4">Đánh giá</th><th className="px-6 py-4">Nội dung</th></tr>
+                  <tr><th className="px-6 py-4">Khách hàng</th><th className="px-6 py-4">Sản phẩm</th><th className="px-6 py-4">Đánh giá</th><th className="px-6 py-4">Nội dung</th><th className="px-6 py-4 text-right">Thao tác</th></tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {reviews.length === 0 ? (
-                    <tr><td colSpan={4} className="px-6 py-8 text-center text-slate-400">Chưa có đánh giá nào.</td></tr>
+                    <tr><td colSpan={5} className="px-6 py-8 text-center text-slate-400">Chưa có đánh giá nào.</td></tr>
                   ) : (
                     reviews.map(rev => (
                       <tr key={rev.id} className="hover:bg-slate-50/50">
@@ -500,6 +646,9 @@ export default function AdminDashboardPage() {
                           {rev.rating} <Star className="w-4 h-4 fill-amber-500" />
                         </td>
                         <td className="px-6 py-4 text-slate-600">{rev.comment || <span className="italic text-slate-400">Không có bình luận</span>}</td>
+                        <td className="px-6 py-4 text-right">
+                          <button onClick={() => deleteReview(rev.id)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4" /></button>
+                        </td>
                       </tr>
                     ))
                   )}
