@@ -146,7 +146,7 @@ export default function ShopLamDienPage() {
       if (!phoneRegex.test(authForm.phone)) return setAuthError("Số điện thoại không hợp lệ.");
     }
     
-    setIsAuthSubmitting(true); // BẬT LOADING
+    setIsAuthSubmitting(true);
     try {
       const res = await fetch(isLoginMode ? '/api/auth/login' : '/api/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(authForm) });
       const data = await res.json();
@@ -160,7 +160,7 @@ export default function ShopLamDienPage() {
     } catch (err) { 
       setAuthError("Lỗi kết nối đến máy chủ."); 
     } finally {
-      setIsAuthSubmitting(false); // TẮT LOADING
+      setIsAuthSubmitting(false);
     }
   };
 
@@ -176,7 +176,7 @@ export default function ShopLamDienPage() {
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsProfileSubmitting(true); // BẬT LOADING
+    setIsProfileSubmitting(true);
     try {
       const res = await fetch('/api/auth/me', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: currentUser.id, ...profileForm }) });
       const data = await res.json();
@@ -190,7 +190,7 @@ export default function ShopLamDienPage() {
     } catch (err) { 
       showToast("Lỗi kết nối.", "error"); 
     } finally {
-      setIsProfileSubmitting(false); // TẮT LOADING
+      setIsProfileSubmitting(false);
     }
   };
 
@@ -272,7 +272,7 @@ export default function ShopLamDienPage() {
     if (!phoneRegex.test(checkoutForm.customerPhone)) return showToast("Số điện thoại không hợp lệ.", "error");
     const finalPaymentStatus = (checkoutForm.paymentMethod === 'QR' && isQrPaid) ? 'PAID' : 'PENDING';
 
-    setIsCheckoutSubmitting(true); // BẬT LOADING
+    setIsCheckoutSubmitting(true);
     try {
       const orderData = { ...checkoutForm, totalAmount: cartTotal, paymentStatus: finalPaymentStatus, items: cart };
       const res = await fetch('/api/orders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(orderData) });
@@ -286,7 +286,7 @@ export default function ShopLamDienPage() {
     } catch (err) { 
       showToast("Lỗi kết nối.", "error"); 
     } finally {
-      setIsCheckoutSubmitting(false); // TẮT LOADING
+      setIsCheckoutSubmitting(false);
     }
   };
 
@@ -341,7 +341,6 @@ export default function ShopLamDienPage() {
       if (res.ok) {
         showToast("Đánh giá sản phẩm thành công", "success");
         setIsReviewModalOpen(false);
-        // Refresh products to get the new review
         const prodRes = await fetch("/api/admin/products");
         if (prodRes.ok) {
           const prods = await prodRes.json();
@@ -370,7 +369,6 @@ export default function ShopLamDienPage() {
   const currentSubCatIds = currentSubCats.map(c => c.id);
 
   const filteredProducts = products.filter(prod => {
-    // 1. SEARCH FILTER & RELEVANCE SCORING (Searches across ALL products)
     let searchScore = 0;
     if (isSearchActive) {
       const nameNorm = normalizeVietnamese(prod.name || "");
@@ -387,7 +385,6 @@ export default function ShopLamDienPage() {
         return false;
       }
 
-      // Ranking score
       if (nameNorm === cleanQuery) searchScore += 200;
       else if (nameNorm.startsWith(cleanQuery)) searchScore += 120;
       else if (nameNorm.includes(cleanQuery)) searchScore += 80;
@@ -399,7 +396,6 @@ export default function ShopLamDienPage() {
       prod._searchScore = searchScore;
     }
 
-    // 2. CATEGORY FILTERING (Only restricts when NOT searching, or if subcategory is chosen)
     let matchesCategory = true;
     if (!isSearchActive) {
       if (activeHeaderTab === "GIẢM GIÁ") {
@@ -433,12 +429,10 @@ export default function ShopLamDienPage() {
       }
     }
 
-    // 3. SIZE & PRICE FILTERING
     const matchesSize = selectedSize ? prod.sizes && prod.sizes.includes(selectedSize) : true;
     const actualPrice = prod.discountPrice || prod.price;
     const matchesPrice = actualPrice <= priceRange;
 
-    // 4. QUICK FILTER
     let matchesQuickFilter = true;
     if (quickFilter === "SALE") {
       matchesQuickFilter = Boolean(prod.discountPrice && prod.discountPrice > 0);
@@ -762,7 +756,6 @@ export default function ShopLamDienPage() {
                       setActiveSubCategory('');
                       setQuickFilter('BEST_SELLER');
                     } else {
-                      // 'ALL'
                       if (activeHeaderTab === 'GIẢM GIÁ' && !isSearchActive) setActiveHeaderTab('NAM');
                       setActiveSubCategory('');
                       setQuickFilter('ALL');
@@ -1225,14 +1218,11 @@ export default function ShopLamDienPage() {
       {/* ==================== DRAWER: MENU ĐIỀU HƯỚNG MOBILE ==================== */}
       {isMobileMenuOpen && (
         <div className="fixed inset-0 z-[200] lg:hidden">
-          {/* Backdrop overlay */}
           <div
             className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-200"
             onClick={() => setIsMobileMenuOpen(false)}
           />
-          {/* Drawer sheet */}
           <div className="fixed top-0 left-0 bottom-0 w-[300px] max-w-[85vw] bg-white z-50 flex flex-col shadow-2xl animate-in slide-in-from-left duration-300">
-            {/* Drawer Header */}
             <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
               <div className="flex items-center gap-2.5">
                 <img src="/images/logo-1.png" alt="Lam Điền" className="h-9 w-auto object-contain" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
@@ -1439,7 +1429,7 @@ export default function ShopLamDienPage() {
             </div>
 
             <div className="flex-1 overflow-y-auto p-5 space-y-6">
-              {/* Subcategories (if active tab has subcategories) */}
+              {/* Subcategories */}
               {!isSearchActive && activeHeaderTab !== "GIẢM GIÁ" && currentSubCats.length > 0 && (
                 <div>
                   <h4 className="font-extrabold text-slate-800 text-xs mb-3 uppercase tracking-wider">Danh mục {activeHeaderTab}</h4>
@@ -1982,7 +1972,6 @@ export default function ShopLamDienPage() {
 
       {/* MODERN FOOTER */}
       <footer className="bg-slate-950 text-slate-300 pt-16 pb-8 border-t border-slate-800 mt-16 relative overflow-hidden">
-        {/* Accent top gradient line */}
         <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-teal-500 via-emerald-400 to-teal-600"></div>
 
         <div className="max-w-7xl mx-auto px-4">

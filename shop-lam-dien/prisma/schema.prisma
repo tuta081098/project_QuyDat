@@ -1,0 +1,142 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb" 
+  url      = env("DATABASE_URL")
+}
+
+// ==========================================
+// HỆ THỐNG E-COMMERCE SHOP LAM ĐIỀN
+// ==========================================
+
+model User {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  email         String?   @unique
+  password      String?   // Bổ sung dấu ? để không bắt buộc nhập mật khẩu (dành cho Google)
+  name          String?
+  image         String?   // Lưu avatar từ Google
+  phone         String?
+  address       String?
+  role          String    @default("USER") 
+  status        String    @default("ACTIVE") 
+  
+  sessionToken  String?  
+  
+  accounts      Account[] // Liên kết tài khoản MXH (Google)
+  reviews       Review[] 
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  emailVerified DateTime?
+  cartData      String?   @default("[]")
+}
+
+model Account {
+  id                String  @id @default(auto()) @map("_id") @db.ObjectId
+  userId            String  @db.ObjectId
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.String
+  access_token      String? @db.String
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.String
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([provider, providerAccountId])
+}
+
+// --- BẢNG DANH MỤC SẢN PHẨM ---
+model Category {
+  id           String     @id @default(auto()) @map("_id") @db.ObjectId
+  name         String
+  slug         String     @unique
+  status       String     @default("ACTIVE")
+  isHeaderMenu Boolean    @default(false)
+  
+  parentId     String?    @db.ObjectId
+  parent       Category?  @relation("SubCategories", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  children     Category[] @relation("SubCategories")
+  
+  products     Product[] 
+  
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+}
+
+// --- BẢNG SẢN PHẨM ---
+model Product {
+  id            String      @id @default(auto()) @map("_id") @db.ObjectId
+  name          String
+  slug          String      @unique
+  sizes         String[]    
+  image         String?
+  status        String      @default("ACTIVE") 
+  
+  price         Int
+  discountPrice Int?
+  stock         Int         @default(0)
+  description   String?
+
+  categoryId    String      @db.ObjectId
+  category      Category    @relation(fields: [categoryId], references: [id])
+  
+  orderItems    OrderItem[] 
+  reviews       Review[]    
+  
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+// --- BẢNG ĐƠN HÀNG ---
+model Order {
+  id            String      @id @default(auto()) @map("_id") @db.ObjectId
+  customerName  String
+  customerEmail String
+  customerPhone String
+  address       String
+  totalAmount   Int
+  status        String      @default("PENDING") // PENDING, CONFIRMED, SHIPPED, DELIVERED, CANCELLED
+  
+  items         OrderItem[] 
+  
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  paymentMethod String      @default("COD") // COD, ONLINE
+  paymentStatus String      @default("PENDING")
+}
+
+// --- BẢNG CHI TIẾT ĐƠN HÀNG ---
+model OrderItem {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  quantity    Int
+  price       Int         // Snapshot: Giá tại thời điểm mua
+  productName String      // Snapshot: Tên sản phẩm lúc mua
+  size        String?     // Kích cỡ khách chọn
+  
+  orderId     String   @db.ObjectId
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  productId   String?  @db.ObjectId
+  product     Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+}
+
+// --- BẢNG ĐÁNH GIÁ ---
+model Review {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  rating     Int      // Từ 1 đến 5 sao
+  comment    String?
+  
+  productId  String   @db.ObjectId
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  userId     String   @db.ObjectId
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt  DateTime @default(now())
+}
