@@ -3,10 +3,11 @@
 import { useState, useEffect } from "react";
 import {
   Search, ShoppingCart, User, MapPin, Phone, Loader2, X, Check, Truck, Ruler, LogOut, CheckCircle2, AlertCircle, ChevronRight, ChevronLeft, Trash2, QrCode, PackageSearch, Package, Star,
-  Sparkles, ShieldCheck, RefreshCw, Headphones, ArrowUp, Heart, Flame, Eye, Tag, Menu, SlidersHorizontal, Filter
+  Sparkles, ShieldCheck, RefreshCw, Headphones, ArrowUp, Heart, Flame, Eye, Tag, Menu, SlidersHorizontal, Filter, Smartphone
 } from "lucide-react";
 import Link from "next/link";
 import { signIn, signOut, getSession } from "next-auth/react";
+import VietQrPaymentSimulator from "@/src/components/payment/VietQrPaymentSimulator";
 
 const HEADER_TABS = ['NAM', 'NỮ', 'TRẺ EM', 'PHỤ KIỆN', 'BỘ SƯU TẬP', 'GIẢM GIÁ'];
 const ALL_SIZES = ['35', '36', '37', '38', '39', '40', '41', '42', '43', '44'];
@@ -261,9 +262,9 @@ export default function ShopLamDienPage() {
     setIsCheckoutOpen(true);
   };
 
-  const handleSimulateQRPayment = () => {
-    showToast("Đang kiểm tra giao dịch...", "success");
-    setTimeout(() => { setIsQrPaid(true); }, 1500);
+  const handleQrPaymentSuccess = (transaction: any) => {
+    setIsQrPaid(true);
+    showToast(`Thanh toán thành công qua ${transaction.bankName}! Mã GD: ${transaction.transactionId}`, "success");
   };
 
   const handleCheckoutSubmit = async (e: React.FormEvent) => {
@@ -1748,62 +1749,88 @@ export default function ShopLamDienPage() {
 
       {/* ==================== MODAL: THANH TOÁN (CHECKOUT) ==================== */}
       {isCheckoutOpen && (
-        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl relative animate-in zoom-in-95 duration-200">
-            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50 rounded-t-3xl">
-              <h2 className="font-black text-slate-800 uppercase flex items-center gap-2">Xác nhận Đặt hàng</h2>
-              <button onClick={() => setIsCheckoutOpen(false)} className="p-2 hover:bg-slate-200 rounded-lg transition-colors"><X className="w-5 h-5 text-slate-600"/></button>
+        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[200] flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className={`bg-white rounded-3xl w-full ${checkoutForm.paymentMethod === 'QR' ? 'max-w-3xl' : 'max-w-lg'} shadow-2xl relative animate-in zoom-in-95 duration-200 transition-all my-auto`}>
+            <div className="p-5 sm:p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50 rounded-t-3xl">
+              <div>
+                <h2 className="font-black text-slate-800 uppercase flex items-center gap-2 text-base sm:text-lg">
+                  Xác nhận Đặt hàng
+                </h2>
+                <p className="text-xs text-slate-400 font-medium mt-0.5">Kiểm tra thông tin giao hàng & chọn hình thức thanh toán</p>
+              </div>
+              <button onClick={() => setIsCheckoutOpen(false)} className="p-2 hover:bg-slate-200 rounded-xl transition-colors"><X className="w-5 h-5 text-slate-600"/></button>
             </div>
             
-            <form onSubmit={handleCheckoutSubmit} className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
-              <div><label className="text-xs font-bold text-slate-500 uppercase block mb-1">Người nhận</label><input type="text" required value={checkoutForm.customerName} onChange={e => setCheckoutForm({...checkoutForm, customerName: e.target.value})} className="w-full px-4 py-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white outline-none focus:border-teal-600 font-medium transition-colors" placeholder="Tên người nhận" /></div>
-              <div><label className="text-xs font-bold text-slate-500 uppercase block mb-1">Email</label><input type="email" required value={checkoutForm.customerEmail} onChange={e => setCheckoutForm({...checkoutForm, customerEmail: e.target.value})} className="w-full px-4 py-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white outline-none focus:border-teal-600 font-medium transition-colors" placeholder="Email nhận thông báo" /></div>
-              <div><label className="text-xs font-bold text-slate-500 uppercase block mb-1">Số điện thoại</label><input type="tel" required value={checkoutForm.customerPhone} onChange={e => setCheckoutForm({...checkoutForm, customerPhone: e.target.value})} className="w-full px-4 py-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white outline-none focus:border-teal-600 font-medium transition-colors" placeholder="SĐT liên hệ giao hàng" /></div>
-              <div><label className="text-xs font-bold text-slate-500 uppercase block mb-1">Địa chỉ giao hàng</label><textarea required rows={2} value={checkoutForm.address} onChange={e => setCheckoutForm({...checkoutForm, address: e.target.value})} className="w-full px-4 py-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white outline-none focus:border-teal-600 font-medium transition-colors" placeholder="Số nhà, đường, phường, quận..." /></div>
+            <form onSubmit={handleCheckoutSubmit} className="p-5 sm:p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div><label className="text-xs font-bold text-slate-500 uppercase block mb-1">Người nhận</label><input type="text" required value={checkoutForm.customerName} onChange={e => setCheckoutForm({...checkoutForm, customerName: e.target.value})} className="w-full px-4 py-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white outline-none focus:border-teal-600 font-medium transition-colors text-sm" placeholder="Tên người nhận" /></div>
+                <div><label className="text-xs font-bold text-slate-500 uppercase block mb-1">Số điện thoại</label><input type="tel" required value={checkoutForm.customerPhone} onChange={e => setCheckoutForm({...checkoutForm, customerPhone: e.target.value})} className="w-full px-4 py-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white outline-none focus:border-teal-600 font-medium transition-colors text-sm" placeholder="SĐT liên hệ giao hàng" /></div>
+              </div>
+              <div><label className="text-xs font-bold text-slate-500 uppercase block mb-1">Email</label><input type="email" required value={checkoutForm.customerEmail} onChange={e => setCheckoutForm({...checkoutForm, customerEmail: e.target.value})} className="w-full px-4 py-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white outline-none focus:border-teal-600 font-medium transition-colors text-sm" placeholder="Email nhận thông báo đơn hàng" /></div>
+              <div><label className="text-xs font-bold text-slate-500 uppercase block mb-1">Địa chỉ giao hàng</label><textarea required rows={2} value={checkoutForm.address} onChange={e => setCheckoutForm({...checkoutForm, address: e.target.value})} className="w-full px-4 py-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white outline-none focus:border-teal-600 font-medium transition-colors text-sm" placeholder="Số nhà, tên đường, phường/xã, quận/huyện, tỉnh/thành phố..." /></div>
               
               <div className="pt-2">
                 <label className="text-xs font-bold text-slate-500 uppercase block mb-2">Phương thức thanh toán</label>
-                <div className="grid grid-cols-2 gap-3">
-                  <div onClick={() => setCheckoutForm({...checkoutForm, paymentMethod: "COD"})} className={`border-2 rounded-xl p-3 cursor-pointer text-center font-bold text-sm transition-all ${checkoutForm.paymentMethod === 'COD' ? 'border-teal-700 bg-teal-50 text-teal-800 shadow-sm' : 'border-slate-100 text-slate-500 hover:bg-slate-50'}`}>Thanh toán khi nhận (COD)</div>
-                  <div onClick={() => setCheckoutForm({...checkoutForm, paymentMethod: "QR"})} className={`border-2 rounded-xl p-3 cursor-pointer text-center font-bold text-sm transition-all ${checkoutForm.paymentMethod === 'QR' ? 'border-teal-700 bg-teal-50 text-teal-800 shadow-sm' : 'border-slate-100 text-slate-500 hover:bg-slate-50'}`}>Chuyển khoản (Mã QR)</div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div 
+                    onClick={() => setCheckoutForm({...checkoutForm, paymentMethod: "COD"})} 
+                    className={`border-2 rounded-2xl p-3.5 cursor-pointer text-center font-bold text-sm transition-all flex flex-col items-center justify-center gap-1 ${checkoutForm.paymentMethod === 'COD' ? 'border-teal-700 bg-teal-50 text-teal-900 shadow-sm ring-2 ring-teal-700/20' : 'border-slate-100 text-slate-500 hover:bg-slate-50'}`}
+                  >
+                    <Truck className="w-5 h-5 text-teal-700" />
+                    <span>Thanh toán khi nhận (COD)</span>
+                    <span className="text-[10px] text-slate-400 font-normal">Nhận hàng kiểm tra rồi thanh toán</span>
+                  </div>
+
+                  <div 
+                    onClick={() => setCheckoutForm({...checkoutForm, paymentMethod: "QR"})} 
+                    className={`border-2 rounded-2xl p-3.5 cursor-pointer text-center font-bold text-sm transition-all flex flex-col items-center justify-center gap-1 relative overflow-hidden ${checkoutForm.paymentMethod === 'QR' ? 'border-teal-700 bg-teal-50 text-teal-900 shadow-sm ring-2 ring-teal-700/20' : 'border-slate-100 text-slate-500 hover:bg-slate-50'}`}
+                  >
+                    <span className="absolute top-1 right-2 text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-rose-500 text-white animate-pulse">Khuyên dùng</span>
+                    <QrCode className="w-5 h-5 text-teal-700" />
+                    <span>Chuyển khoản (VietQR Napas 247)</span>
+                    <span className="text-[10px] text-teal-700 font-bold">Xác nhận tức thì qua Webhook</span>
+                  </div>
                 </div>
               </div>
 
               {checkoutForm.paymentMethod === "QR" && (
-                <div className="bg-slate-50 p-6 rounded-2xl border-none shadow-inner flex flex-col items-center animate-in fade-in zoom-in-95">
-                  {!isQrPaid ? (
-                    <>
-                      <p className="text-xs font-black text-slate-700 mb-3 uppercase text-center flex items-center gap-2"><QrCode className="w-4 h-4"/> Quét mã để thanh toán ngay</p>
-                      <div className="p-3 bg-white rounded-xl shadow-sm border border-slate-100">
-                        <img src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=THANHTOAN_${cartTotal}_${checkoutForm.customerPhone}`} alt="QR Code" className="w-32 h-32 opacity-95" />
-                      </div>
-                      <p className="text-[11px] font-medium text-slate-500 mt-3 text-center">Hoặc chuyển khoản thủ công tới STK: <span className="font-bold text-teal-700">0123456789</span></p>
-                      <button type="button" onClick={handleSimulateQRPayment} className="mt-5 w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold uppercase rounded-xl shadow-md transition-colors">
-                        Giả lập: Quét QR & Thanh toán
-                      </button>
-                    </>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center py-6 animate-in zoom-in">
-                      <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mb-3 shadow-sm">
-                        <Check className="w-8 h-8" />
-                      </div>
-                      <p className="text-sm font-black text-emerald-700 uppercase tracking-wider">Thanh toán thành công</p>
-                      <p className="text-xs text-slate-500 mt-1 font-medium">Hệ thống đã ghi nhận khoản tiền {formatVND(cartTotal)}</p>
-                    </div>
-                  )}
+                <div className="pt-2 animate-in fade-in zoom-in-95 duration-200">
+                  <VietQrPaymentSimulator
+                    amount={cartTotal}
+                    customerName={checkoutForm.customerName}
+                    customerPhone={checkoutForm.customerPhone}
+                    isPaid={isQrPaid}
+                    onPaymentSuccess={handleQrPaymentSuccess}
+                  />
                 </div>
               )}
 
-              <div className="bg-teal-50 p-5 rounded-2xl flex justify-between items-center border-none shadow-sm mt-4">
-                 <span className="font-bold text-teal-800 text-sm uppercase tracking-wider">Tổng thanh toán:</span><span className="text-2xl font-black text-teal-700">{formatVND(cartTotal)}</span>
+              <div className="bg-gradient-to-r from-teal-50 to-emerald-50 p-4 sm:p-5 rounded-2xl flex justify-between items-center border border-teal-100 shadow-xs mt-4">
+                 <div>
+                   <span className="font-bold text-teal-900 text-xs sm:text-sm uppercase tracking-wider block">Tổng thanh toán:</span>
+                   <span className="text-[11px] text-teal-700">Đã bao gồm VAT & Miễn phí giao hàng</span>
+                 </div>
+                 <span className="text-xl sm:text-2xl font-black text-teal-800">{formatVND(cartTotal)}</span>
               </div>
               
               <button 
                 type="submit" 
                 disabled={(checkoutForm.paymentMethod === 'QR' && !isQrPaid) || isCheckoutSubmitting}
-                className="w-full py-4 mt-4 bg-slate-900 hover:bg-teal-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-black rounded-xl uppercase transition-colors shadow-lg shadow-slate-900/20 tracking-widest flex items-center justify-center gap-2"
+                className="w-full py-4 mt-4 bg-slate-900 hover:bg-teal-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-black rounded-2xl uppercase transition-all shadow-xl shadow-slate-900/20 tracking-widest flex items-center justify-center gap-2 transform active:scale-98"
               >
-                {isCheckoutSubmitting ? <Loader2 className="w-5 h-5 animate-spin"/> : (checkoutForm.paymentMethod === 'QR' && !isQrPaid ? 'Vui lòng thanh toán QR để tiếp tục' : 'Hoàn Tất Đặt Hàng')}
+                {isCheckoutSubmitting ? (
+                  <Loader2 className="w-5 h-5 animate-spin"/>
+                ) : (
+                  checkoutForm.paymentMethod === 'QR' && !isQrPaid ? (
+                    <span className="flex items-center gap-2">
+                      <QrCode className="w-4 h-4" /> Vui lòng quét QR & xác nhận thanh toán
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-2">
+                      <CheckCircle2 className="w-5 h-5 text-emerald-400" /> Hoàn Tất Đặt Hàng Ngay
+                    </span>
+                  )
+                )}
               </button>
             </form>
           </div>
