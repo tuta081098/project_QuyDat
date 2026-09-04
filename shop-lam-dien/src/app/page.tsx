@@ -216,8 +216,8 @@ export default function ShopLamDienPage() {
     const actualPrice = product.discountPrice || product.price;
     const cartItemId = `${product.id}_${size || 'freesize'}`;
     const existingItem = cart.find(item => item.cartItemId === cartItemId);
-    const currentQty = existingItem ? existingItem.quantity : 0;
-    if (currentQty + 1 > product.stock) return showToast(`Sản phẩm này chỉ còn ${product.stock} chiếc trong kho!`, "error");
+    const totalProductQty = cart.filter(item => item.productId === product.id).reduce((sum, item) => sum + item.quantity, 0);
+    if (totalProductQty + 1 > product.stock) return showToast("Đã hết hàng", "error");
 
     let newCart = [...cart];
     if (existingItem) newCart = newCart.map(item => item.cartItemId === cartItemId ? { ...item, quantity: item.quantity + 1 } : item);
@@ -235,7 +235,10 @@ export default function ShopLamDienPage() {
     const itemToUpdate = cart.find(item => item.cartItemId === cartItemId);
     if (!itemToUpdate) return;
     const productData = products.find(p => p.id === itemToUpdate.productId);
-    if (delta > 0 && productData && (itemToUpdate.quantity + delta > productData.stock)) return showToast(`Chỉ còn ${productData.stock} sản phẩm trong kho!`, "error");
+    if (delta > 0 && productData) {
+      const totalProductQty = cart.filter(item => item.productId === itemToUpdate.productId).reduce((sum, item) => sum + item.quantity, 0);
+      if (totalProductQty + delta > productData.stock) return showToast("Đã hết hàng", "error");
+    }
 
     const newCart = cart.map(item => {
       if (item.cartItemId === cartItemId) {
@@ -251,11 +254,37 @@ export default function ShopLamDienPage() {
 
   const openCheckout = () => {
     if (cart.length === 0) return showToast("Giỏ hàng đang trống!", "error");
-    if (currentUser) {
-      setCheckoutForm({ customerName: currentUser.name || "", customerEmail: currentUser.email || "", customerPhone: currentUser.phone || "", address: currentUser.address || "", paymentMethod: "COD" });
-    } else {
-      setCheckoutForm({ customerName: "", customerEmail: "", customerPhone: "", address: "", paymentMethod: "COD" });
+    if (!currentUser) {
+      showToast("Vui lòng đăng nhập để đặt hàng!", "error");
+      setIsAuthModalOpen(true);
+      setIsLoginMode(true);
+      return;
     }
+    setCheckoutForm({ customerName: currentUser.name || "", customerEmail: currentUser.email || "", customerPhone: currentUser.phone || "", address: currentUser.address || "", paymentMethod: "COD" });
+    setIsQrPaid(false);
+    setIsCartOpen(false);
+    setIsCheckoutOpen(true);
+  };
+
+  const buyNow = (product: any, size: string) => {
+    if (!size && product.sizes?.length > 0) return showToast("Vui lòng chọn Size!", "error");
+    if (!currentUser) {
+      showToast("Vui lòng đăng nhập để mua hàng!", "error");
+      setIsAuthModalOpen(true);
+      setIsLoginMode(true);
+      return;
+    }
+    const actualPrice = product.discountPrice || product.price;
+    const cartItemId = `${product.id}_${size || 'freesize'}`;
+    const totalProductQty = cart.filter(item => item.productId === product.id).reduce((sum, item) => sum + item.quantity, 0);
+    if (totalProductQty + 1 > product.stock) return showToast("Đã hết hàng", "error");
+    const existingItem = cart.find(item => item.cartItemId === cartItemId);
+    let newCart = [...cart];
+    if (existingItem) newCart = newCart.map(item => item.cartItemId === cartItemId ? { ...item, quantity: item.quantity + 1 } : item);
+    else newCart.push({ cartItemId, productId: product.id, name: product.name, price: actualPrice, size: size || null, image: product.image, quantity: 1 });
+    saveCart(newCart);
+    setSelectedProduct(null);
+    setCheckoutForm({ customerName: currentUser.name || "", customerEmail: currentUser.email || "", customerPhone: currentUser.phone || "", address: currentUser.address || "", paymentMethod: "COD" });
     setIsQrPaid(false);
     setIsCartOpen(false);
     setIsCheckoutOpen(true);
@@ -546,9 +575,9 @@ export default function ShopLamDienPage() {
           {/* Action Buttons */}
           <div className="flex items-center gap-1.5 sm:gap-2 text-slate-700">
             {/* Search Input Box */}
-            <div className="flex items-center relative">
+            <div className="relative">
               {isSearchOpen ? (
-                <div className="flex items-center bg-slate-100 border border-teal-600/50 rounded-xl px-3 py-1.5 sm:py-2 w-48 sm:w-64 md:w-80 shadow-inner transition-all animate-in fade-in zoom-in-95 duration-200">
+                <div className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center bg-white border border-teal-600/50 rounded-xl px-3 py-1.5 sm:py-2 w-64 sm:w-72 md:w-80 shadow-lg transition-all animate-in fade-in zoom-in-95 duration-200 z-50">
                   <button
                     type="button"
                     onClick={() => handleExecuteSearch()}
@@ -991,7 +1020,7 @@ export default function ShopLamDienPage() {
                 {isSearchActive ? (
                   <>Tìm thấy <span className="text-teal-700 font-extrabold">{filteredProducts.length}</span> sản phẩm phù hợp trên toàn hệ thống</>
                 ) : (
-                  <>Hiển thị <span className="text-teal-700 font-extrabold">{filteredProducts.length}</span> sản phẩm chất lượng</>
+                  <>Hiển thị <span className="text-teal-700 font-extrabold">{filteredProducts.length}</span> sản phẩm</>
                 )}
               </p>
             </div>
@@ -1051,16 +1080,25 @@ export default function ShopLamDienPage() {
           ) : filteredProducts.length === 0 ? (
             <div className="text-center py-20 bg-white border border-slate-100 shadow-sm rounded-3xl p-8">
               <div className="w-16 h-16 bg-slate-50 text-slate-300 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <Search className="w-8 h-8" />
+                <Package className="w-8 h-8" />
               </div>
-              <h3 className="text-base font-black text-slate-800 uppercase mb-1">Không tìm thấy sản phẩm nào</h3>
-              <p className="text-xs text-slate-500 font-medium max-w-sm mx-auto mb-6">Hãy thử tìm với từ khóa khác hoặc điều chỉnh lại bộ lọc kích cỡ, khoảng giá của bạn.</p>
-              <button
-                onClick={() => { setActiveSubCategory(""); setSelectedSize(""); setPriceRange(5000000); handleClearSearch(); setQuickFilter("ALL"); setIsSearchOpen(false); }}
-                className="px-6 py-3 bg-teal-700 hover:bg-teal-800 text-white font-black rounded-xl text-xs uppercase tracking-wider transition-all shadow-md shadow-teal-700/20"
-              >
-                Xem tất cả sản phẩm
-              </button>
+              {(activeSubCategory || selectedSize || priceRange < 5000000 || isSearchActive || quickFilter !== "ALL") ? (
+                <>
+                  <h3 className="text-base font-black text-slate-800 uppercase mb-1">Không tìm thấy sản phẩm nào</h3>
+                  <p className="text-xs text-slate-500 font-medium max-w-sm mx-auto mb-6">Hãy thử tìm với từ khóa khác hoặc điều chỉnh lại bộ lọc kích cỡ, khoảng giá của bạn.</p>
+                  <button
+                    onClick={() => { setActiveSubCategory(""); setSelectedSize(""); setPriceRange(5000000); handleClearSearch(); setQuickFilter("ALL"); setIsSearchOpen(false); }}
+                    className="px-6 py-3 bg-teal-700 hover:bg-teal-800 text-white font-black rounded-xl text-xs uppercase tracking-wider transition-all shadow-md shadow-teal-700/20"
+                  >
+                    Xem tất cả sản phẩm
+                  </button>
+                </>
+              ) : (
+                <>
+                  <h3 className="text-base font-black text-slate-800 uppercase mb-1">Không có sản phẩm</h3>
+                  <p className="text-xs text-slate-500 font-medium max-w-sm mx-auto">Hiện chưa có sản phẩm nào trong danh mục này.</p>
+                </>
+              )}
             </div>
           ) : (
             <>
@@ -1677,9 +1715,14 @@ export default function ShopLamDienPage() {
               </div>
 
               <div className="mt-auto pt-6">
-                 <button disabled={selectedProduct.stock === 0} onClick={() => addToCart(selectedProduct, popupSize)} className="w-full bg-teal-700 hover:bg-teal-800 disabled:bg-slate-200 disabled:text-slate-400 text-white py-4 rounded-xl font-black uppercase text-sm tracking-widest shadow-lg shadow-teal-700/20 active:scale-[0.98] transition-all">
-                   {selectedProduct.stock === 0 ? "Tạm hết hàng" : "Thêm vào giỏ hàng"}
-                 </button>
+                 <div className="flex gap-3">
+                   <button disabled={selectedProduct.stock === 0} onClick={() => addToCart(selectedProduct, popupSize)} className="flex-1 bg-white hover:bg-slate-50 disabled:bg-slate-100 disabled:text-slate-300 text-teal-700 py-4 rounded-xl font-black uppercase text-sm tracking-widest border-2 border-teal-700 disabled:border-slate-200 active:scale-[0.98] transition-all">
+                     {selectedProduct.stock === 0 ? "Tạm hết hàng" : "Thêm giỏ hàng"}
+                   </button>
+                   <button disabled={selectedProduct.stock === 0} onClick={() => buyNow(selectedProduct, popupSize)} className="flex-1 bg-teal-700 hover:bg-teal-800 disabled:bg-slate-200 disabled:text-slate-400 text-white py-4 rounded-xl font-black uppercase text-sm tracking-widest shadow-lg shadow-teal-700/20 active:scale-[0.98] transition-all">
+                     {selectedProduct.stock === 0 ? "Tạm hết hàng" : "Mua ngay"}
+                   </button>
+                 </div>
                  <div className="flex gap-6 mt-5 justify-center">
                     <span className="flex items-center gap-1.5 text-xs text-slate-500 font-bold"><Check className="w-4 h-4 text-emerald-500"/> Sẵn {selectedProduct.stock} SP</span>
                     <span className="flex items-center gap-1.5 text-xs text-slate-500 font-bold"><Truck className="w-4 h-4 text-teal-500"/> Freeship toàn quốc</span>

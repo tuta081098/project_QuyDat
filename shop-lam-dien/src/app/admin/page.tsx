@@ -181,7 +181,7 @@ export default function AdminDashboardPage() {
       const data = await res.json();
       if (data.secure_url) {
         setProdForm({ ...prodForm, image: data.secure_url });
-        showToast("Tải ảnh lên mây thành công!", "success");
+        showToast("Tải ảnh thành công!", "success");
       }
     } catch (error) {
       showToast("Lỗi khi tải ảnh lên server.", "error");
@@ -218,6 +218,10 @@ export default function AdminDashboardPage() {
 
   const handleProductSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!prodForm.name.trim()) return showToast("Vui lòng nhập tên sản phẩm", "error");
+    if (!prodForm.categoryId) return showToast("Vui lòng chọn danh mục", "error");
+    if (!prodForm.price || Number(prodForm.price) <= 0) return showToast("Vui lòng nhập giá bán hợp lệ (lớn hơn 0)", "error");
+    if (prodForm.stock === "" || Number(prodForm.stock) < 0) return showToast("Vui lòng nhập số lượng kho hợp lệ", "error");
     setIsSubmittingProd(true);
 
     try {
@@ -769,11 +773,11 @@ export default function AdminDashboardPage() {
               </div>
 
               <div className="col-span-2 mt-2">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Tên sản phẩm</label>
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Tên sản phẩm <span className="text-red-500">*</span></label>
                 <input type="text" required value={prodForm.name} onChange={(e) => setProdForm({ ...prodForm, name: e.target.value, slug: generateSlug(e.target.value) })} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl font-semibold text-slate-800 outline-none" />
               </div>
               <div className="col-span-2 mt-2">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Gán vào Danh mục con</label>
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Gán vào Danh mục con <span className="text-red-500">*</span></label>
                 <select value={prodForm.categoryId} onChange={(e) => setProdForm({ ...prodForm, categoryId: e.target.value })} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl font-bold text-teal-700 bg-teal-50/30 outline-none">
                   <option value="">-- Chọn danh mục --</option>
                   {categories.filter(c => c.parentId).map(c => <option key={c.id} value={c.id}>{c.parent?.name} {'>'} {c.name}</option>)}
@@ -785,7 +789,7 @@ export default function AdminDashboardPage() {
               </div>
 
               <div className="mt-2">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Giá bán gốc (VND)</label>
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Giá bán gốc (VND) <span className="text-red-500">*</span></label>
                 <input type="number" required value={prodForm.price} onChange={(e) => setProdForm({ ...prodForm, price: e.target.value })} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl font-bold outline-none" />
               </div>
 
@@ -795,7 +799,7 @@ export default function AdminDashboardPage() {
               </div>
 
               <div className="mt-2 col-span-2">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Số lượng kho</label>
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Số lượng kho <span className="text-red-500">*</span></label>
                 <input type="number" required value={prodForm.stock} onChange={(e) => setProdForm({ ...prodForm, stock: e.target.value })} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl font-bold outline-none" />
               </div>
 
