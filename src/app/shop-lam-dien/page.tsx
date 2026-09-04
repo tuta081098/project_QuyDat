@@ -9,7 +9,7 @@ import Link from "next/link";
 import { signIn, signOut, getSession } from "next-auth/react";
 import VietQrPaymentSimulator from "@/src/components/payment/VietQrPaymentSimulator";
 
-const HEADER_TABS = ['NAM', 'NỮ', 'TRẺ EM', 'PHỤ KIỆN', 'BỘ SƯU TẬP', 'GIẢM GIÁ'];
+const HEADER_TABS = ['TẤT CẢ', 'NAM', 'NỮ', 'TRẺ EM', 'PHỤ KIỆN', 'BỘ SƯU TẬP', 'GIẢM GIÁ'];
 const ALL_SIZES = ['35', '36', '37', '38', '39', '40', '41', '42', '43', '44'];
 const ITEMS_PER_PAGE = 8;
 
@@ -29,7 +29,7 @@ export default function ShopLamDienPage() {
   const [products, setProducts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
-  const [activeHeaderTab, setActiveHeaderTab] = useState<string>("NAM");
+  const [activeHeaderTab, setActiveHeaderTab] = useState<string>("TẤT CẢ");
   const [activeSubCategory, setActiveSubCategory] = useState<string>("");
   const [searchInput, setSearchInput] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -99,6 +99,7 @@ export default function ShopLamDienPage() {
   };
 
   useEffect(() => {
+    document.title = "Shop Lam Điền";
     const loadShopData = async () => {
       setIsLoading(true);
       try {
@@ -432,7 +433,13 @@ export default function ShopLamDienPage() {
     // 2. CATEGORY FILTERING (Only restricts when NOT searching, or if subcategory is chosen)
     let matchesCategory = true;
     if (!isSearchActive) {
-      if (activeHeaderTab === "GIẢM GIÁ") {
+      if (activeHeaderTab === "TẤT CẢ") {
+        if (activeSubCategory) {
+          matchesCategory = prod.categoryId === activeSubCategory || prod.category?.id === activeSubCategory;
+        } else {
+          matchesCategory = true;
+        }
+      } else if (activeHeaderTab === "GIẢM GIÁ") {
         matchesCategory = Boolean(prod.discountPrice && prod.discountPrice > 0);
       } else {
         if (activeSubCategory) {
@@ -542,7 +549,7 @@ export default function ShopLamDienPage() {
             </button>
 
             {/* Logo Brand */}
-            <div className="flex-shrink-0 flex items-center cursor-pointer group" onClick={() => { setActiveHeaderTab("NAM"); setActiveSubCategory(""); setQuickFilter("ALL"); handleClearSearch(); setIsSearchOpen(false); }}>
+            <div className="flex-shrink-0 flex items-center cursor-pointer group" onClick={() => { setActiveHeaderTab("TẤT CẢ"); setActiveSubCategory(""); setQuickFilter("ALL"); handleClearSearch(); setIsSearchOpen(false); }}>
               <div className="relative flex items-center gap-2.5 sm:gap-3">
                 <img src="/images/logo-1.png" alt="Lam Điền" className="h-10 sm:h-12 md:h-14 w-auto object-contain transition-transform group-hover:scale-105" onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.parentElement?.classList.add('fallback-logo-active'); }} />
                 <div className="flex flex-col">
@@ -758,7 +765,7 @@ export default function ShopLamDienPage() {
             {isSearchActive ? (
               <>Tìm kiếm <span className="bg-clip-text text-transparent bg-gradient-to-r from-teal-300 via-emerald-400 to-teal-200">Sản phẩm</span></>
             ) : (
-              <>Khám phá <span className={`bg-clip-text text-transparent ${activeHeaderTab === 'GIẢM GIÁ' ? 'bg-gradient-to-r from-red-400 to-amber-400' : 'bg-gradient-to-r from-teal-300 via-emerald-400 to-teal-200'}`}>{activeHeaderTab}</span></>
+              <>Khám phá <span className={`bg-clip-text text-transparent ${activeHeaderTab === 'GIẢM GIÁ' ? 'bg-gradient-to-r from-red-400 to-amber-400' : 'bg-gradient-to-r from-teal-300 via-emerald-400 to-teal-200'}`}>{activeHeaderTab === 'TẤT CẢ' ? 'Tất cả sản phẩm' : activeHeaderTab}</span></>
             )}
           </h1>
           <p className="mt-2 sm:mt-3 text-slate-300 text-xs sm:text-sm md:text-base font-medium max-w-lg mx-auto tracking-wide leading-relaxed">
@@ -788,12 +795,12 @@ export default function ShopLamDienPage() {
                       setActiveSubCategory('');
                       setQuickFilter('SALE');
                     } else if (pill.id === 'BEST_SELLER') {
-                      if (activeHeaderTab === 'GIẢM GIÁ' && !isSearchActive) setActiveHeaderTab('NAM');
+                      if (activeHeaderTab === 'GIẢM GIÁ' && !isSearchActive) setActiveHeaderTab('TẤT CẢ');
                       setActiveSubCategory('');
                       setQuickFilter('BEST_SELLER');
                     } else {
                       // 'ALL'
-                      if (activeHeaderTab === 'GIẢM GIÁ' && !isSearchActive) setActiveHeaderTab('NAM');
+                      if (activeHeaderTab === 'GIẢM GIÁ' && !isSearchActive) setActiveHeaderTab('TẤT CẢ');
                       setActiveSubCategory('');
                       setQuickFilter('ALL');
                       setSelectedSize('');
@@ -851,10 +858,10 @@ export default function ShopLamDienPage() {
               <span className="font-black text-slate-900 uppercase text-xs tracking-wider flex items-center gap-2">
                 <Tag className="w-3.5 h-3.5 text-teal-700" /> Bộ Lọc Tìm Kiếm
               </span>
-              {(activeSubCategory || selectedSize || priceRange < 5000000 || isSearchActive || activeHeaderTab === "GIẢM GIÁ" || quickFilter !== "ALL") && (
+              {(activeSubCategory || selectedSize || priceRange < 5000000 || isSearchActive || activeHeaderTab === "GIẢM GIÁ" || activeHeaderTab !== "TẤT CẢ" || quickFilter !== "ALL") && (
                 <button
                   onClick={() => {
-                    if (activeHeaderTab === "GIẢM GIÁ") setActiveHeaderTab("NAM");
+                    setActiveHeaderTab("TẤT CẢ");
                     setActiveSubCategory("");
                     setSelectedSize("");
                     setPriceRange(5000000);
@@ -870,7 +877,7 @@ export default function ShopLamDienPage() {
             </div>
 
             {/* Sub Categories (Desktop) */}
-            {!isSearchActive && activeHeaderTab !== "GIẢM GIÁ" && (
+            {!isSearchActive && activeHeaderTab !== "GIẢM GIÁ" && activeHeaderTab !== "TẤT CẢ" && (
               <div>
                 <h3 className="font-extrabold text-slate-800 text-xs mb-3 uppercase tracking-wider">Danh mục con</h3>
                 {matchedRootCat ? (
@@ -1018,6 +1025,8 @@ export default function ShopLamDienPage() {
                   </span>
                 ) : activeHeaderTab === "GIẢM GIÁ" ? (
                   <span className="flex items-center gap-2 text-red-600"><Flame className="w-7 h-7" /> Siêu Khuyến Mãi</span>
+                ) : activeHeaderTab === "TẤT CẢ" ? (
+                  <span className="flex items-center gap-2 text-slate-900">Tất Cả Sản Phẩm</span>
                 ) : quickFilter === "BEST_SELLER" ? (
                   <span className="flex items-center gap-2 text-teal-800"><Sparkles className="w-6 h-6 text-amber-500" /> Sản Phẩm Bán Chạy</span>
                 ) : (
@@ -1063,7 +1072,7 @@ export default function ShopLamDienPage() {
                 )}
                 <button
                   onClick={() => {
-                    if (activeHeaderTab === "GIẢM GIÁ") setActiveHeaderTab("NAM");
+                    setActiveHeaderTab("TẤT CẢ");
                     setActiveSubCategory("");
                     setSelectedSize("");
                     setPriceRange(5000000);
@@ -1479,7 +1488,7 @@ export default function ShopLamDienPage() {
 
             <div className="flex-1 overflow-y-auto p-5 space-y-6">
               {/* Subcategories (if active tab has subcategories) */}
-              {!isSearchActive && activeHeaderTab !== "GIẢM GIÁ" && currentSubCats.length > 0 && (
+              {!isSearchActive && activeHeaderTab !== "GIẢM GIÁ" && activeHeaderTab !== "TẤT CẢ" && currentSubCats.length > 0 && (
                 <div>
                   <h4 className="font-extrabold text-slate-800 text-xs mb-3 uppercase tracking-wider">Danh mục {activeHeaderTab}</h4>
                   <div className="grid grid-cols-2 gap-2">

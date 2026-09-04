@@ -59,6 +59,10 @@ export default function AdminDashboardPage() {
     { id: "REVIEWS", label: "Đánh giá", icon: Star }
   ];
 
+  useEffect(() => {
+    document.title = "Shop Lam Điền - Quản trị Admin";
+  }, []);
+
   useEffect(() => { loadTabContextData(); }, [activeTab]);
 
   const loadTabContextData = async () => {

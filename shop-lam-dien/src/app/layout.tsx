@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Shop Lam Điền - Giày Dép Cao Cấp",
+  title: "Shop Lam Điền",
   description: "Thương hiệu giày dép Việt Nam chất lượng cao - Lam Điền Footwear & Lifestyle",
 };
 

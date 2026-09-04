@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Lam Điền - Quản Trị Shop",
+  title: "Shop Lam Điền",
   description: "Hệ thống quản trị Shop Giày Dép Lam Điền",
 };
 
