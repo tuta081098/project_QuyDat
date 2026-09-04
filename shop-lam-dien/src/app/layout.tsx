@@ -7,12 +7,12 @@ const inter = Inter({ subsets: ['latin', 'vietnamese'], variable: '--font-sans' 
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
-  subsets: ["latin", "vietnamese"],
+  subsets: ["latin"],
 });
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
-  subsets: ["latin", "vietnamese"],
+  subsets: ["latin"],
 });
 
 export const metadata: Metadata = {
