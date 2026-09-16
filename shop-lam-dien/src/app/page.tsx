@@ -27,15 +27,15 @@ export default function ShopLamDienPage() {
   const [categories, setCategories] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  
+
   const [activeHeaderTab, setActiveHeaderTab] = useState<string>("TẤT CẢ");
   const [activeSubCategory, setActiveSubCategory] = useState<string>("");
   const [searchInput, setSearchInput] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [selectedSize, setSelectedSize] = useState<string>("");
-  const [priceRange, setPriceRange] = useState<number>(5000000); 
+  const [priceRange, setPriceRange] = useState<number>(5000000);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [quickFilter, setQuickFilter] = useState<string>("ALL"); 
+  const [quickFilter, setQuickFilter] = useState<string>("ALL");
 
   const handleExecuteSearch = (queryOverride?: string) => {
     const target = typeof queryOverride === 'string' ? queryOverride : searchInput;
@@ -73,13 +73,13 @@ export default function ShopLamDienPage() {
   const [cart, setCart] = useState<any[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
-  
+
   const [checkoutForm, setCheckoutForm] = useState({ customerName: "", customerEmail: "", customerPhone: "", address: "", paymentMethod: "COD" });
   const [isQrPaid, setIsQrPaid] = useState(false);
 
   const [isTrackModalOpen, setIsTrackModalOpen] = useState(false);
   const [trackPhone, setTrackPhone] = useState("");
-  
+
   // --- CÁC STATE CHỐNG DOUBLE CLICK (LOADING SPINNER) ---
   const [isTracking, setIsTracking] = useState(false);
   const [isAuthSubmitting, setIsAuthSubmitting] = useState(false);
@@ -102,10 +102,10 @@ export default function ShopLamDienPage() {
     const loadShopData = async () => {
       setIsLoading(true);
       try {
-        const [catRes, prodRes] = await Promise.all([ fetch("/api/admin/categories"), fetch("/api/admin/products") ]);
+        const [catRes, prodRes] = await Promise.all([fetch("/api/admin/categories"), fetch("/api/admin/products")]);
         if (catRes.ok) setCategories((await catRes.json()).filter((c: any) => c.status === "ACTIVE"));
         if (prodRes.ok) setProducts((await prodRes.json()).filter((p: any) => p.status !== "DELETED"));
-        
+
         let loggedInUser = null;
         const session = await getSession();
         const userEmail = session?.user?.email || (localStorage.getItem("lamdien_user") ? JSON.parse(localStorage.getItem("lamdien_user")!).email : null);
@@ -118,7 +118,7 @@ export default function ShopLamDienPage() {
               loggedInUser = data;
               setCurrentUser(data);
               localStorage.setItem("lamdien_user", JSON.stringify(data));
-              
+
               if (data.cartData && data.cartData !== "[]") {
                 const dbCart = JSON.parse(data.cartData);
                 setCart(dbCart);
@@ -141,38 +141,38 @@ export default function ShopLamDienPage() {
 
   const handleAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setAuthError(""); 
+    setAuthError("");
     if (!isLoginMode) {
       const phoneRegex = /(84|0[3|5|7|8|9])+([0-9]{8})\b/;
       if (!phoneRegex.test(authForm.phone)) return setAuthError("Số điện thoại không hợp lệ.");
     }
-    
+
     setIsAuthSubmitting(true);
     try {
       const res = await fetch(isLoginMode ? '/api/auth/login' : '/api/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(authForm) });
       const data = await res.json();
       if (!res.ok) return setAuthError(data.error);
-      
+
       localStorage.setItem("lamdien_user", JSON.stringify(data.data));
       setCurrentUser(data.data);
       setIsAuthModalOpen(false);
-      setAuthForm({ name: "", email: "", phone: "", password: "" }); 
+      setAuthForm({ name: "", email: "", phone: "", password: "" });
       showToast(isLoginMode ? "Đăng nhập thành công!" : "Đăng ký thành công!", "success");
-    } catch (err) { 
-      setAuthError("Lỗi kết nối đến máy chủ."); 
+    } catch (err) {
+      setAuthError("Lỗi kết nối đến máy chủ.");
     } finally {
       setIsAuthSubmitting(false);
     }
   };
 
-  const handleLogout = async () => { 
-    localStorage.removeItem("lamdien_user"); 
+  const handleLogout = async () => {
+    localStorage.removeItem("lamdien_user");
     localStorage.removeItem("lamdien_cart");
-    setCurrentUser(null); 
+    setCurrentUser(null);
     setCart([]);
-    setIsProfileModalOpen(false); 
-    showToast("Đã đăng xuất.", "success"); 
-    await signOut({ redirect: false }); 
+    setIsProfileModalOpen(false);
+    showToast("Đã đăng xuất.", "success");
+    await signOut({ redirect: false });
   };
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
@@ -188,8 +188,8 @@ export default function ShopLamDienPage() {
         setIsProfileModalOpen(false);
         showToast("Cập nhật thông tin thành công!", "success");
       } else { showToast(data.error || "Cập nhật thất bại", "error"); }
-    } catch (err) { 
-      showToast("Lỗi kết nối.", "error"); 
+    } catch (err) {
+      showToast("Lỗi kết nối.", "error");
     } finally {
       setIsProfileSubmitting(false);
     }
@@ -200,15 +200,15 @@ export default function ShopLamDienPage() {
     setIsProfileModalOpen(true);
   };
 
-  const saveCart = (newCart: any[]) => { 
-    setCart(newCart); 
-    localStorage.setItem("lamdien_cart", JSON.stringify(newCart)); 
+  const saveCart = (newCart: any[]) => {
+    setCart(newCart);
+    localStorage.setItem("lamdien_cart", JSON.stringify(newCart));
     if (currentUser && currentUser.id) {
-       fetch('/api/auth/me', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: currentUser.id, cartData: JSON.stringify(newCart) })
-       }).catch(err => console.error(err));
+      fetch('/api/auth/me', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: currentUser.id, cartData: JSON.stringify(newCart) })
+      }).catch(err => console.error(err));
     }
   };
 
@@ -223,7 +223,7 @@ export default function ShopLamDienPage() {
     let newCart = [...cart];
     if (existingItem) newCart = newCart.map(item => item.cartItemId === cartItemId ? { ...item, quantity: item.quantity + 1 } : item);
     else newCart.push({ cartItemId, productId: product.id, name: product.name, price: actualPrice, size: size || null, image: product.image, quantity: 1 });
-    
+
     saveCart(newCart);
     showToast("Đã thêm vào giỏ hàng!", "success");
     setIsCartOpen(true);
@@ -231,7 +231,7 @@ export default function ShopLamDienPage() {
   };
 
   const removeFromCart = (cartItemId: string) => { saveCart(cart.filter(item => item.cartItemId !== cartItemId)); };
-  
+
   const updateQuantity = (cartItemId: string, delta: number) => {
     const itemToUpdate = cart.find(item => item.cartItemId === cartItemId);
     if (!itemToUpdate) return;
@@ -308,13 +308,13 @@ export default function ShopLamDienPage() {
       const res = await fetch('/api/orders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(orderData) });
       if (res.ok) {
         showToast("Đặt hàng thành công! Chúng tôi sẽ chuẩn bị đơn sớm nhất.", "success");
-        saveCart([]); 
+        saveCart([]);
         setIsCheckoutOpen(false);
         const prodRes = await fetch("/api/admin/products");
         if (prodRes.ok) setProducts((await prodRes.json()).filter((p: any) => p.status !== "DELETED"));
       } else { showToast("Có lỗi xảy ra hoặc sản phẩm vừa hết hàng.", "error"); }
-    } catch (err) { 
-      showToast("Lỗi kết nối.", "error"); 
+    } catch (err) {
+      showToast("Lỗi kết nối.", "error");
     } finally {
       setIsCheckoutSubmitting(false);
     }
@@ -323,7 +323,7 @@ export default function ShopLamDienPage() {
   const handleTrackOrderSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!trackPhone.trim()) return showToast("Vui lòng nhập số điện thoại", "error");
-    
+
     setIsTracking(true);
     try {
       const res = await fetch(`/api/orders/track?phone=${trackPhone}`);
@@ -418,11 +418,11 @@ export default function ShopLamDienPage() {
       if (nameNorm === cleanQuery) searchScore += 200;
       else if (nameNorm.startsWith(cleanQuery)) searchScore += 120;
       else if (nameNorm.includes(cleanQuery)) searchScore += 80;
-      
+
       if (queryTokens.every(tok => nameNorm.includes(tok))) searchScore += 40;
       if (catNorm.includes(cleanQuery) || parentCatNorm.includes(cleanQuery)) searchScore += 30;
       if (descNorm.includes(cleanQuery)) searchScore += 15;
-      
+
       prod._searchScore = searchScore;
     }
 
@@ -497,10 +497,10 @@ export default function ShopLamDienPage() {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-slate-900 font-sans selection:bg-teal-200">
-      
+
       {toast.visible && (
         <div className={`fixed top-24 right-6 z-[9999] flex items-center gap-3 px-5 py-4 rounded-xl shadow-2xl animate-in slide-in-from-top-8 fade-in text-sm font-bold text-white ${toast.type === 'success' ? 'bg-emerald-600' : 'bg-red-600'}`}>
-          {toast.type === 'success' ? <CheckCircle2 className="w-5 h-5"/> : <AlertCircle className="w-5 h-5"/>} {toast.message}
+          {toast.type === 'success' ? <CheckCircle2 className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />} {toast.message}
         </div>
       )}
 
@@ -529,7 +529,7 @@ export default function ShopLamDienPage() {
       {/* HEADER */}
       <header className="bg-white/90 backdrop-blur-md sticky top-0 z-40 border-b border-slate-100/80 shadow-sm transition-all">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-20 flex justify-between items-center">
-          
+
           <div className="flex items-center gap-2">
             {/* Mobile Hamburger Menu Toggle */}
             <button
@@ -552,7 +552,7 @@ export default function ShopLamDienPage() {
               </div>
             </div>
           </div>
-          
+
           {/* Navigation Tabs (Desktop) */}
           <nav className="hidden lg:flex space-x-1.5 items-center bg-slate-50/80 p-1.5 rounded-2xl border border-slate-100">
             {HEADER_TABS.map((item) => {
@@ -562,15 +562,14 @@ export default function ShopLamDienPage() {
                 <button
                   key={item}
                   onClick={() => { setActiveHeaderTab(item); setActiveSubCategory(""); setQuickFilter(item === 'GIẢM GIÁ' ? 'SALE' : 'ALL'); handleClearSearch(); setIsSearchOpen(false); }}
-                  className={`px-4 py-2 text-xs font-black uppercase tracking-wider rounded-xl transition-all duration-200 flex items-center gap-1.5 ${
-                    isActive
+                  className={`px-4 py-2 text-xs font-black uppercase tracking-wider rounded-xl transition-all duration-200 flex items-center gap-1.5 ${isActive
                       ? isSale
                         ? 'bg-gradient-to-r from-red-500 to-rose-600 text-white shadow-md shadow-red-500/20'
                         : 'bg-teal-700 text-white shadow-md shadow-teal-700/20'
                       : isSale
-                      ? 'text-red-500 hover:bg-red-50'
-                      : 'text-slate-600 hover:bg-white hover:text-teal-700'
-                  }`}
+                        ? 'text-red-500 hover:bg-red-50'
+                        : 'text-slate-600 hover:bg-white hover:text-teal-700'
+                    }`}
                 >
                   {isSale && <Flame className={`w-3.5 h-3.5 ${isActive ? 'text-amber-300' : 'text-red-500 animate-pulse'}`} />}
                   {item}
@@ -632,11 +631,10 @@ export default function ShopLamDienPage() {
               ) : (
                 <button
                   onClick={() => setIsSearchOpen(true)}
-                  className={`p-2 sm:p-2.5 rounded-xl transition-all ${
-                    isSearchActive
+                  className={`p-2 sm:p-2.5 rounded-xl transition-all ${isSearchActive
                       ? 'bg-teal-50 text-teal-700 border border-teal-200 shadow-xs'
                       : 'hover:bg-slate-100 text-slate-600 hover:text-teal-700'
-                  }`}
+                    }`}
                   title="Tìm kiếm tất cả sản phẩm"
                 >
                   <Search className="w-5 h-5" />
@@ -692,15 +690,14 @@ export default function ShopLamDienPage() {
                     handleClearSearch();
                     setIsSearchOpen(false);
                   }}
-                  className={`flex-shrink-0 px-3.5 py-1.5 text-xs font-black uppercase tracking-wider rounded-xl transition-all duration-200 flex items-center gap-1 ${
-                    isActive
+                  className={`flex-shrink-0 px-3.5 py-1.5 text-xs font-black uppercase tracking-wider rounded-xl transition-all duration-200 flex items-center gap-1 ${isActive
                       ? isSale
                         ? 'bg-gradient-to-r from-red-500 to-rose-600 text-white shadow-sm shadow-red-500/30'
                         : 'bg-teal-700 text-white shadow-sm shadow-teal-700/30'
                       : isSale
-                      ? 'text-red-600 bg-red-50 hover:bg-red-100'
-                      : 'text-slate-600 bg-slate-50 hover:bg-slate-100 border border-slate-100'
-                  }`}
+                        ? 'text-red-600 bg-red-50 hover:bg-red-100'
+                        : 'text-slate-600 bg-slate-50 hover:bg-slate-100 border border-slate-100'
+                    }`}
                 >
                   {isSale && <Flame className={`w-3.5 h-3.5 ${isActive ? 'text-amber-300' : 'text-red-500 animate-pulse'}`} />}
                   {item}
@@ -714,11 +711,10 @@ export default function ShopLamDienPage() {
             <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-2 mt-1.5 border-t border-slate-100 min-w-max">
               <button
                 onClick={() => setActiveSubCategory("")}
-                className={`flex-shrink-0 px-3 py-1 rounded-lg text-[11px] font-bold transition-all ${
-                  activeSubCategory === ""
+                className={`flex-shrink-0 px-3 py-1 rounded-lg text-[11px] font-bold transition-all ${activeSubCategory === ""
                     ? 'bg-teal-700 text-white shadow-xs'
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
+                  }`}
               >
                 Tất cả {activeHeaderTab}
               </button>
@@ -728,11 +724,10 @@ export default function ShopLamDienPage() {
                   <button
                     key={subCat.id}
                     onClick={() => setActiveSubCategory(subCat.id)}
-                    className={`flex-shrink-0 px-3 py-1 rounded-lg text-[11px] font-bold transition-all ${
-                      isSelected
+                    className={`flex-shrink-0 px-3 py-1 rounded-lg text-[11px] font-bold transition-all ${isSelected
                         ? 'bg-teal-700 text-white shadow-xs'
                         : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                    }`}
+                      }`}
                   >
                     {subCat.name}
                   </button>
@@ -776,8 +771,8 @@ export default function ShopLamDienPage() {
                 pill.id === 'SALE'
                   ? (activeHeaderTab === 'GIẢM GIÁ' || quickFilter === 'SALE')
                   : pill.id === 'BEST_SELLER'
-                  ? quickFilter === 'BEST_SELLER'
-                  : quickFilter === 'ALL' && activeHeaderTab !== 'GIẢM GIÁ';
+                    ? quickFilter === 'BEST_SELLER'
+                    : quickFilter === 'ALL' && activeHeaderTab !== 'GIẢM GIÁ';
 
               return (
                 <button
@@ -799,11 +794,10 @@ export default function ShopLamDienPage() {
                       setPriceRange(5000000);
                     }
                   }}
-                  className={`px-3.5 sm:px-4 py-1.5 rounded-full text-xs font-bold transition-all duration-200 border ${
-                    isActive
+                  className={`px-3.5 sm:px-4 py-1.5 rounded-full text-xs font-bold transition-all duration-200 border ${isActive
                       ? 'bg-teal-500 text-white border-teal-400 shadow-md shadow-teal-500/30 scale-105'
                       : 'bg-white/10 hover:bg-white/20 text-white/90 border-white/15 backdrop-blur-sm'
-                  }`}
+                    }`}
                 >
                   {pill.label}
                 </button>
@@ -840,11 +834,11 @@ export default function ShopLamDienPage() {
 
       {/* BỘ LỌC VÀ LƯỚI SẢN PHẨM */}
       <div className="max-w-7xl mx-auto px-4 py-8 sm:py-10 flex flex-col lg:flex-row gap-8">
-        
+
         {/* SIDEBAR FILTER (DESKTOP) */}
         <aside className="hidden lg:block w-64 flex-shrink-0">
           <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-[0_4px_25px_rgb(0,0,0,0.03)] sticky top-28 space-y-6">
-            
+
             {/* Filter Header */}
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
               <span className="font-black text-slate-900 uppercase text-xs tracking-wider flex items-center gap-2">
@@ -876,11 +870,10 @@ export default function ShopLamDienPage() {
                   <div className="flex flex-col gap-1.5">
                     <button
                       onClick={() => setActiveSubCategory("")}
-                      className={`text-left px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-between ${
-                        activeSubCategory === ""
+                      className={`text-left px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-between ${activeSubCategory === ""
                           ? 'bg-teal-700 text-white shadow-md shadow-teal-700/20'
                           : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-                      }`}
+                        }`}
                     >
                       <span>Tất cả {activeHeaderTab}</span>
                       {activeSubCategory === "" && <Check className="w-3.5 h-3.5" />}
@@ -891,11 +884,10 @@ export default function ShopLamDienPage() {
                         <button
                           key={subCat.id}
                           onClick={() => setActiveSubCategory(subCat.id)}
-                          className={`text-left px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-between ${
-                            isSelected
+                          className={`text-left px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-between ${isSelected
                               ? 'bg-teal-700 text-white shadow-md shadow-teal-700/20'
                               : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-                          }`}
+                            }`}
                         >
                           <span>{subCat.name}</span>
                           {isSelected ? <Check className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5 text-slate-300" />}
@@ -908,7 +900,7 @@ export default function ShopLamDienPage() {
                 )}
               </div>
             )}
-            
+
             {/* Size Filter */}
             <div className="pt-2">
               <div className="flex items-center justify-between mb-3">
@@ -924,11 +916,10 @@ export default function ShopLamDienPage() {
                     <button
                       key={size}
                       onClick={() => setSelectedSize(selectedSize === size ? "" : size)}
-                      className={`h-9 flex items-center justify-center rounded-xl text-xs font-black transition-all ${
-                        isSelected
+                      className={`h-9 flex items-center justify-center rounded-xl text-xs font-black transition-all ${isSelected
                           ? 'bg-teal-700 text-white shadow-md shadow-teal-700/20 scale-105'
                           : 'bg-slate-50 text-slate-700 hover:bg-slate-100 hover:text-slate-900 border border-slate-100'
-                      }`}
+                        }`}
                     >
                       {size}
                     </button>
@@ -965,7 +956,7 @@ export default function ShopLamDienPage() {
 
         {/* MAIN PRODUCT GRID */}
         <main className="flex-1 min-w-0">
-          
+
           {/* MOBILE FILTER & SORT BAR (MOBILE ONLY) */}
           <div className="lg:hidden flex items-center justify-between gap-2.5 mb-6 bg-white p-3 rounded-2xl border border-slate-100 shadow-xs">
             <button
@@ -992,11 +983,10 @@ export default function ShopLamDienPage() {
                   <button
                     key={sortPill.id}
                     onClick={() => setQuickFilter(sortPill.id)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
-                      isSelected
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${isSelected
                         ? 'bg-teal-700 text-white shadow-xs'
                         : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-100'
-                    }`}
+                      }`}
                   >
                     {sortPill.label}
                   </button>
@@ -1158,7 +1148,7 @@ export default function ShopLamDienPage() {
                           alt={prod.name}
                           className="w-full h-full object-contain mix-blend-multiply group-hover:scale-110 transition-transform duration-500 ease-out"
                         />
-                        
+
                         {/* Quick View Button on Hover */}
                         <div className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                           <span className="px-3 py-1.5 bg-white/90 backdrop-blur-sm rounded-xl text-[11px] font-black text-slate-800 shadow-md flex items-center gap-1.5 transform translate-y-2 group-hover:translate-y-0 transition-transform">
@@ -1166,10 +1156,10 @@ export default function ShopLamDienPage() {
                           </span>
                         </div>
                       </div>
-                      
+
                       {/* Details Section */}
                       <div className="p-4 sm:p-5 flex flex-col flex-1">
-                        
+
                         {/* Title */}
                         <h3
                           className="font-bold text-slate-800 text-xs sm:text-sm mb-1.5 group-hover:text-teal-700 transition-colors line-clamp-2 cursor-pointer leading-snug"
@@ -1177,7 +1167,7 @@ export default function ShopLamDienPage() {
                         >
                           {prod.name}
                         </h3>
-                        
+
                         {/* Rating Stars & Count */}
                         <div className="flex items-center gap-1.5 mb-3 min-h-[16px]">
                           {ratingAvg ? (
@@ -1190,7 +1180,7 @@ export default function ShopLamDienPage() {
                             <span className="text-[10px] text-slate-400 font-medium">Chưa có đánh giá</span>
                           )}
                         </div>
-                        
+
                         {/* Price Display */}
                         <div className="mt-auto mb-3.5">
                           {isSale ? (
@@ -1233,17 +1223,16 @@ export default function ShopLamDienPage() {
                     onClick={() => setCurrentPage(prev => prev - 1)}
                     className="p-2.5 bg-white border border-slate-200/80 shadow-sm rounded-xl hover:bg-slate-50 disabled:opacity-40 transition-all"
                   >
-                    <ChevronLeft className="w-4 h-4 text-slate-600"/>
+                    <ChevronLeft className="w-4 h-4 text-slate-600" />
                   </button>
                   {Array.from({ length: totalPages }).map((_, idx) => (
                     <button
                       key={idx}
                       onClick={() => setCurrentPage(idx + 1)}
-                      className={`w-9 h-9 flex items-center justify-center rounded-xl font-bold text-xs transition-all ${
-                        currentPage === idx + 1
+                      className={`w-9 h-9 flex items-center justify-center rounded-xl font-bold text-xs transition-all ${currentPage === idx + 1
                           ? 'bg-teal-700 text-white shadow-md shadow-teal-700/20'
                           : 'bg-white border border-slate-200/80 shadow-sm hover:bg-slate-50 text-slate-600'
-                      }`}
+                        }`}
                     >
                       {idx + 1}
                     </button>
@@ -1253,7 +1242,7 @@ export default function ShopLamDienPage() {
                     onClick={() => setCurrentPage(prev => prev + 1)}
                     className="p-2.5 bg-white border border-slate-200/80 shadow-sm rounded-xl hover:bg-slate-50 disabled:opacity-40 transition-all"
                   >
-                    <ChevronRight className="w-4 h-4 text-slate-600"/>
+                    <ChevronRight className="w-4 h-4 text-slate-600" />
                   </button>
                 </div>
               )}
@@ -1318,7 +1307,7 @@ export default function ShopLamDienPage() {
             {/* Drawer Body - Category Navigation */}
             <div className="flex-1 overflow-y-auto p-3 space-y-1">
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider px-2 py-1">Danh mục sản phẩm</p>
-              
+
               {HEADER_TABS.map((tab) => {
                 const isActive = activeHeaderTab === tab && !isSearchActive;
                 const isSale = tab === 'GIẢM GIÁ';
@@ -1329,15 +1318,14 @@ export default function ShopLamDienPage() {
                 return (
                   <div key={tab} className="rounded-xl overflow-hidden">
                     <div
-                      className={`flex items-center justify-between px-3.5 py-3 rounded-xl transition-all cursor-pointer ${
-                        isActive
+                      className={`flex items-center justify-between px-3.5 py-3 rounded-xl transition-all cursor-pointer ${isActive
                           ? isSale
                             ? 'bg-gradient-to-r from-red-500 to-rose-600 text-white font-black shadow-sm'
                             : 'bg-teal-700 text-white font-black shadow-sm'
                           : isSale
-                          ? 'text-red-600 bg-red-50 hover:bg-red-100 font-bold'
-                          : 'text-slate-700 hover:bg-slate-50 font-bold'
-                      }`}
+                            ? 'text-red-600 bg-red-50 hover:bg-red-100 font-bold'
+                            : 'text-slate-700 hover:bg-slate-50 font-bold'
+                        }`}
                       onClick={() => {
                         setActiveHeaderTab(tab);
                         setActiveSubCategory("");
@@ -1378,11 +1366,10 @@ export default function ShopLamDienPage() {
                             handleClearSearch();
                             setIsMobileMenuOpen(false);
                           }}
-                          className={`w-full text-left px-3 py-2 text-xs rounded-lg transition-colors flex items-center justify-between ${
-                            activeSubCategory === "" && activeHeaderTab === tab
+                          className={`w-full text-left px-3 py-2 text-xs rounded-lg transition-colors flex items-center justify-between ${activeSubCategory === "" && activeHeaderTab === tab
                               ? 'font-black text-teal-700 bg-teal-50'
                               : 'font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                          }`}
+                            }`}
                         >
                           <span>Tất cả {tab}</span>
                           {activeSubCategory === "" && activeHeaderTab === tab && <Check className="w-3.5 h-3.5 text-teal-700" />}
@@ -1396,11 +1383,10 @@ export default function ShopLamDienPage() {
                               handleClearSearch();
                               setIsMobileMenuOpen(false);
                             }}
-                            className={`w-full text-left px-3 py-2 text-xs rounded-lg transition-colors flex items-center justify-between ${
-                              activeSubCategory === sub.id
+                            className={`w-full text-left px-3 py-2 text-xs rounded-lg transition-colors flex items-center justify-between ${activeSubCategory === sub.id
                                 ? 'font-black text-teal-700 bg-teal-50'
                                 : 'font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                            }`}
+                              }`}
                           >
                             <span>{sub.name}</span>
                             {activeSubCategory === sub.id && <Check className="w-3.5 h-3.5 text-teal-700" />}
@@ -1483,11 +1469,10 @@ export default function ShopLamDienPage() {
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       onClick={() => setActiveSubCategory("")}
-                      className={`px-3 py-2.5 rounded-xl text-xs font-bold text-left transition-all border ${
-                        activeSubCategory === ""
+                      className={`px-3 py-2.5 rounded-xl text-xs font-bold text-left transition-all border ${activeSubCategory === ""
                           ? 'bg-teal-700 text-white border-teal-700 shadow-xs'
                           : 'bg-slate-50 text-slate-700 border-slate-100 hover:bg-slate-100'
-                      }`}
+                        }`}
                     >
                       Tất cả {activeHeaderTab}
                     </button>
@@ -1497,11 +1482,10 @@ export default function ShopLamDienPage() {
                         <button
                           key={subCat.id}
                           onClick={() => setActiveSubCategory(subCat.id)}
-                          className={`px-3 py-2.5 rounded-xl text-xs font-bold text-left transition-all border truncate ${
-                            isSelected
+                          className={`px-3 py-2.5 rounded-xl text-xs font-bold text-left transition-all border truncate ${isSelected
                               ? 'bg-teal-700 text-white border-teal-700 shadow-xs'
                               : 'bg-slate-50 text-slate-700 border-slate-100 hover:bg-slate-100'
-                          }`}
+                            }`}
                         >
                           {subCat.name}
                         </button>
@@ -1524,11 +1508,10 @@ export default function ShopLamDienPage() {
                       <button
                         key={size}
                         onClick={() => setSelectedSize(selectedSize === size ? "" : size)}
-                        className={`h-10 flex items-center justify-center rounded-xl text-xs font-black transition-all ${
-                          isSelected
+                        className={`h-10 flex items-center justify-center rounded-xl text-xs font-black transition-all ${isSelected
                             ? 'bg-teal-700 text-white shadow-md shadow-teal-700/20 scale-105'
                             : 'bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-100'
-                        }`}
+                          }`}
                       >
                         {size}
                       </button>
@@ -1585,75 +1568,75 @@ export default function ShopLamDienPage() {
       {isTrackModalOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl relative animate-in zoom-in-95 duration-200 overflow-hidden flex flex-col max-h-[90vh]">
-             <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-               <h2 className="font-black text-slate-800 uppercase flex items-center gap-2 tracking-wider text-sm"><PackageSearch className="w-5 h-5 text-teal-700"/> Tra cứu đơn hàng</h2>
-               <button onClick={() => { setIsTrackModalOpen(false); setTrackResults(null); }} className="p-1.5 hover:bg-slate-200 rounded-lg transition-colors"><X className="w-5 h-5 text-slate-600" /></button>
-             </div>
-             
-             <div className="p-6 border-b border-slate-100 bg-white">
-                <form onSubmit={handleTrackOrderSubmit} className="flex gap-3">
-                  <input type="tel" placeholder="Nhập số điện thoại mua hàng..." required value={trackPhone} onChange={(e) => setTrackPhone(e.target.value)} className="flex-1 px-4 py-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white outline-none focus:border-teal-600 font-medium transition-colors" />
-                  <button type="submit" disabled={isTracking} className="px-6 py-3 bg-teal-700 hover:bg-teal-800 disabled:bg-slate-300 text-white font-bold rounded-xl whitespace-nowrap transition-colors flex items-center gap-2">
-                    {isTracking ? <Loader2 className="w-4 h-4 animate-spin"/> : <Search className="w-4 h-4"/>} Tra cứu
-                  </button>
-                </form>
-             </div>
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+              <h2 className="font-black text-slate-800 uppercase flex items-center gap-2 tracking-wider text-sm"><PackageSearch className="w-5 h-5 text-teal-700" /> Tra cứu đơn hàng</h2>
+              <button onClick={() => { setIsTrackModalOpen(false); setTrackResults(null); }} className="p-1.5 hover:bg-slate-200 rounded-lg transition-colors"><X className="w-5 h-5 text-slate-600" /></button>
+            </div>
 
-             <div className="flex-1 overflow-y-auto p-6 bg-slate-50/50">
-                {!trackResults ? (
-                   <div className="h-40 flex flex-col items-center justify-center text-slate-400">
-                      <Package className="w-10 h-10 mb-3 opacity-20"/>
-                      <p className="text-sm font-medium">Nhập số điện thoại để xem lịch sử mua hàng của bạn</p>
-                   </div>
-                ) : trackResults.length === 0 ? (
-                   <div className="h-40 flex items-center justify-center text-red-500 font-bold text-sm">Không tìm thấy đơn hàng nào khớp với SĐT này.</div>
-                ) : (
-                   <div className="space-y-4">
-                     {trackResults.map((order: any) => (
-                       <div key={order.id} className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm">
-                          <div className="flex justify-between items-start mb-4 pb-4 border-b border-slate-50">
-                             <div>
-                               <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Mã đơn: {order.id.slice(-6)}</p>
-                               <p className="text-sm font-bold text-slate-700">{new Date(order.createdAt).toLocaleDateString('vi-VN')} - {new Date(order.createdAt).toLocaleTimeString('vi-VN')}</p>
-                             </div>
-                             <div className="text-right flex flex-col gap-1.5 items-end">
-                                <span className={`px-2.5 py-1 rounded text-[10px] font-black uppercase tracking-wider ${order.status === 'PENDING' ? 'bg-amber-100 text-amber-700' : order.status === 'DELIVERED' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>
-                                  {order.status === 'PENDING' ? 'Đang xử lý' : order.status === 'DELIVERED' ? 'Đã giao' : order.status}
-                                </span>
-                                <span className={`px-2.5 py-1 rounded text-[10px] font-black uppercase tracking-wider ${order.paymentStatus === 'PAID' ? 'bg-teal-50 text-teal-700' : 'bg-slate-100 text-slate-600'}`}>
-                                  {order.paymentStatus === 'PAID' ? 'Đã thanh toán' : 'Chưa thanh toán'}
-                                </span>
-                             </div>
+            <div className="p-6 border-b border-slate-100 bg-white">
+              <form onSubmit={handleTrackOrderSubmit} className="flex gap-3">
+                <input type="tel" placeholder="Nhập số điện thoại mua hàng..." required value={trackPhone} onChange={(e) => setTrackPhone(e.target.value)} className="flex-1 px-4 py-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white outline-none focus:border-teal-600 font-medium transition-colors" />
+                <button type="submit" disabled={isTracking} className="px-6 py-3 bg-teal-700 hover:bg-teal-800 disabled:bg-slate-300 text-white font-bold rounded-xl whitespace-nowrap transition-colors flex items-center gap-2">
+                  {isTracking ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />} Tra cứu
+                </button>
+              </form>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6 bg-slate-50/50">
+              {!trackResults ? (
+                <div className="h-40 flex flex-col items-center justify-center text-slate-400">
+                  <Package className="w-10 h-10 mb-3 opacity-20" />
+                  <p className="text-sm font-medium">Nhập số điện thoại để xem lịch sử mua hàng của bạn</p>
+                </div>
+              ) : trackResults.length === 0 ? (
+                <div className="h-40 flex items-center justify-center text-red-500 font-bold text-sm">Không tìm thấy đơn hàng nào khớp với SĐT này.</div>
+              ) : (
+                <div className="space-y-4">
+                  {trackResults.map((order: any) => (
+                    <div key={order.id} className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm">
+                      <div className="flex justify-between items-start mb-4 pb-4 border-b border-slate-50">
+                        <div>
+                          <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Mã đơn: {order.id.slice(-6)}</p>
+                          <p className="text-sm font-bold text-slate-700">{new Date(order.createdAt).toLocaleDateString('vi-VN')} - {new Date(order.createdAt).toLocaleTimeString('vi-VN')}</p>
+                        </div>
+                        <div className="text-right flex flex-col gap-1.5 items-end">
+                          <span className={`px-2.5 py-1 rounded text-[10px] font-black uppercase tracking-wider ${order.status === 'PENDING' ? 'bg-amber-100 text-amber-700' : order.status === 'DELIVERED' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>
+                            {order.status === 'PENDING' ? 'Đang xử lý' : order.status === 'DELIVERED' ? 'Đã giao' : order.status}
+                          </span>
+                          <span className={`px-2.5 py-1 rounded text-[10px] font-black uppercase tracking-wider ${order.paymentStatus === 'PAID' ? 'bg-teal-50 text-teal-700' : 'bg-slate-100 text-slate-600'}`}>
+                            {order.paymentStatus === 'PAID' ? 'Đã thanh toán' : 'Chưa thanh toán'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="space-y-3 mb-4">
+                        {order.items.map((item: any, idx: number) => (
+                          <div key={idx} className="flex justify-between items-center text-sm">
+                            <div className="flex items-center gap-3">
+                              <span className="w-6 h-6 bg-slate-100 rounded flex items-center justify-center font-bold text-slate-500 text-xs">{item.quantity}</span>
+                              <span className="font-bold text-slate-800">{item.productName} <span className="text-slate-400 font-normal">({item.size || 'Free'})</span></span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <span className="font-bold text-teal-700">{formatVND(item.price)}</span>
+                              {order.status === 'DELIVERED' && (
+                                <button onClick={() => openReviewModal(item.productId, item.productName)} className="px-2 py-1 bg-amber-50 text-amber-600 rounded text-xs font-bold hover:bg-amber-100 transition-colors flex items-center gap-1">
+                                  <Star className="w-3 h-3 fill-amber-500" /> Đánh giá
+                                </button>
+                              )}
+                            </div>
                           </div>
-                          
-                          <div className="space-y-3 mb-4">
-                            {order.items.map((item: any, idx: number) => (
-                               <div key={idx} className="flex justify-between items-center text-sm">
-                                  <div className="flex items-center gap-3">
-                                    <span className="w-6 h-6 bg-slate-100 rounded flex items-center justify-center font-bold text-slate-500 text-xs">{item.quantity}</span>
-                                    <span className="font-bold text-slate-800">{item.productName} <span className="text-slate-400 font-normal">({item.size || 'Free'})</span></span>
-                                  </div>
-                                  <div className="flex items-center gap-3">
-                                    <span className="font-bold text-teal-700">{formatVND(item.price)}</span>
-                                    {order.status === 'DELIVERED' && (
-                                      <button onClick={() => openReviewModal(item.productId, item.productName)} className="px-2 py-1 bg-amber-50 text-amber-600 rounded text-xs font-bold hover:bg-amber-100 transition-colors flex items-center gap-1">
-                                        <Star className="w-3 h-3 fill-amber-500" /> Đánh giá
-                                      </button>
-                                    )}
-                                  </div>
-                               </div>
-                            ))}
-                          </div>
-                          
-                          <div className="flex justify-between items-center pt-4 border-t border-slate-50 border-dashed">
-                             <span className="text-xs font-bold text-slate-500 uppercase">Tổng cộng</span>
-                             <span className="text-lg font-black text-slate-900">{formatVND(order.totalAmount)}</span>
-                          </div>
-                       </div>
-                     ))}
-                   </div>
-                )}
-             </div>
+                        ))}
+                      </div>
+
+                      <div className="flex justify-between items-center pt-4 border-t border-slate-50 border-dashed">
+                        <span className="text-xs font-bold text-slate-500 uppercase">Tổng cộng</span>
+                        <span className="text-lg font-black text-slate-900">{formatVND(order.totalAmount)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -1663,15 +1646,15 @@ export default function ShopLamDienPage() {
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-y-auto flex flex-col md:flex-row shadow-2xl relative">
             <button onClick={() => { setSelectedProduct(null); setPopupSize(""); }} className="absolute top-4 right-4 p-2 bg-slate-100 hover:bg-slate-200 rounded-lg z-10 transition-colors"><X className="w-5 h-5 text-slate-600" /></button>
-            
+
             <div className="w-full md:w-1/2 bg-[#F8FAFC] min-h-[300px] flex items-center justify-center p-8">
-               <img src={selectedProduct.image || "https://images.unsplash.com/photo-1608231387042-66d1773070a5?auto=format&fit=crop&q=80&w=600"} alt={selectedProduct.name} className="w-full h-auto object-contain mix-blend-multiply drop-shadow-2xl hover:scale-105 transition-transform duration-700" />
+              <img src={selectedProduct.image || "https://images.unsplash.com/photo-1608231387042-66d1773070a5?auto=format&fit=crop&q=80&w=600"} alt={selectedProduct.name} className="w-full h-auto object-contain mix-blend-multiply drop-shadow-2xl hover:scale-105 transition-transform duration-700" />
             </div>
 
             <div className="w-full md:w-1/2 p-8 lg:p-10 flex flex-col bg-white">
               <span className="bg-slate-100 text-slate-600 text-[10px] font-black px-2.5 py-1 rounded-md uppercase tracking-wider w-fit mb-4">{selectedProduct.category?.name || "Lam Điền"}</span>
               <h2 className="text-2xl font-black text-slate-900 mb-3 leading-tight">{selectedProduct.name}</h2>
-              
+
               {selectedProduct.discountPrice && selectedProduct.discountPrice > 0 ? (
                 <div className="flex items-end gap-3 mb-6">
                   <span className="text-3xl font-black text-red-600 leading-none">{formatVND(selectedProduct.discountPrice)}</span>
@@ -1687,32 +1670,32 @@ export default function ShopLamDienPage() {
 
               {/* Reviews Section */}
               <div className="mb-6">
-                 <h3 className="font-bold text-slate-800 text-sm mb-3">Đánh giá sản phẩm ({selectedProduct.reviews?.length || 0})</h3>
-                 <div className="space-y-3 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
-                   {selectedProduct.reviews && selectedProduct.reviews.length > 0 ? (
-                     selectedProduct.reviews.map((rev: any) => (
-                       <div key={rev.id} className="bg-slate-50 p-3 rounded-xl">
-                         <div className="flex justify-between items-center mb-1.5">
-                           <span className="font-bold text-xs text-slate-800">{rev.user?.name || "Người dùng ẩn danh"}</span>
-                           <div className="flex gap-0.5">
-                             {[1, 2, 3, 4, 5].map(star => (
-                               <Star key={star} className={`w-3 h-3 ${rev.rating >= star ? 'fill-amber-400 text-amber-400' : 'text-slate-200'}`} />
-                             ))}
-                           </div>
-                         </div>
-                         <p className="text-xs text-slate-600">{rev.comment}</p>
-                       </div>
-                     ))
-                   ) : (
-                     <p className="text-xs text-slate-500 italic">Chưa có đánh giá nào.</p>
-                   )}
-                 </div>
+                <h3 className="font-bold text-slate-800 text-sm mb-3">Đánh giá sản phẩm ({selectedProduct.reviews?.length || 0})</h3>
+                <div className="space-y-3 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
+                  {selectedProduct.reviews && selectedProduct.reviews.length > 0 ? (
+                    selectedProduct.reviews.map((rev: any) => (
+                      <div key={rev.id} className="bg-slate-50 p-3 rounded-xl">
+                        <div className="flex justify-between items-center mb-1.5">
+                          <span className="font-bold text-xs text-slate-800">{rev.user?.name || "Người dùng ẩn danh"}</span>
+                          <div className="flex gap-0.5">
+                            {[1, 2, 3, 4, 5].map(star => (
+                              <Star key={star} className={`w-3 h-3 ${rev.rating >= star ? 'fill-amber-400 text-amber-400' : 'text-slate-200'}`} />
+                            ))}
+                          </div>
+                        </div>
+                        <p className="text-xs text-slate-600">{rev.comment}</p>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-xs text-slate-500 italic">Chưa có đánh giá nào.</p>
+                  )}
+                </div>
               </div>
 
               <div className="mb-6">
                 <div className="flex justify-between items-center mb-4">
                   <span className="font-bold text-slate-800 text-xs uppercase tracking-wider">Chọn Size</span>
-                  <span onClick={() => setIsSizeGuideOpen(true)} className="flex items-center gap-1.5 text-xs text-teal-700 hover:text-teal-900 cursor-pointer font-bold"><Ruler className="w-3.5 h-3.5"/> Hướng dẫn chọn size</span>
+                  <span onClick={() => setIsSizeGuideOpen(true)} className="flex items-center gap-1.5 text-xs text-teal-700 hover:text-teal-900 cursor-pointer font-bold"><Ruler className="w-3.5 h-3.5" /> Hướng dẫn chọn size</span>
                 </div>
                 <div className="flex flex-wrap gap-2.5">
                   {selectedProduct.sizes && selectedProduct.sizes.length > 0 ? (
@@ -1724,18 +1707,18 @@ export default function ShopLamDienPage() {
               </div>
 
               <div className="mt-auto pt-6">
-                 <div className="flex gap-3">
-                   <button disabled={selectedProduct.stock === 0} onClick={() => addToCart(selectedProduct, popupSize)} className="flex-1 bg-white hover:bg-slate-50 disabled:bg-slate-100 disabled:text-slate-300 text-teal-700 py-4 rounded-xl font-black uppercase text-sm tracking-widest border-2 border-teal-700 disabled:border-slate-200 active:scale-[0.98] transition-all">
-                     {selectedProduct.stock === 0 ? "Tạm hết hàng" : "Thêm giỏ hàng"}
-                   </button>
-                   <button disabled={selectedProduct.stock === 0} onClick={() => buyNow(selectedProduct, popupSize)} className="flex-1 bg-teal-700 hover:bg-teal-800 disabled:bg-slate-200 disabled:text-slate-400 text-white py-4 rounded-xl font-black uppercase text-sm tracking-widest shadow-lg shadow-teal-700/20 active:scale-[0.98] transition-all">
-                     {selectedProduct.stock === 0 ? "Tạm hết hàng" : "Mua ngay"}
-                   </button>
-                 </div>
-                 <div className="flex gap-6 mt-5 justify-center">
-                    <span className="flex items-center gap-1.5 text-xs text-slate-500 font-bold"><Check className="w-4 h-4 text-emerald-500"/> Sẵn {selectedProduct.stock} SP</span>
-                    <span className="flex items-center gap-1.5 text-xs text-slate-500 font-bold"><Truck className="w-4 h-4 text-teal-500"/> Freeship toàn quốc</span>
-                 </div>
+                <div className="flex gap-3">
+                  <button disabled={selectedProduct.stock === 0} onClick={() => addToCart(selectedProduct, popupSize)} className="flex-1 bg-white hover:bg-slate-50 disabled:bg-slate-100 disabled:text-slate-300 text-teal-700 py-4 rounded-xl font-black uppercase text-sm tracking-widest border-2 border-teal-700 disabled:border-slate-200 active:scale-[0.98] transition-all">
+                    {selectedProduct.stock === 0 ? "Tạm hết hàng" : "Thêm giỏ hàng"}
+                  </button>
+                  <button disabled={selectedProduct.stock === 0} onClick={() => buyNow(selectedProduct, popupSize)} className="flex-1 bg-teal-700 hover:bg-teal-800 disabled:bg-slate-200 disabled:text-slate-400 text-white py-4 rounded-xl font-black uppercase text-sm tracking-widest shadow-lg shadow-teal-700/20 active:scale-[0.98] transition-all">
+                    {selectedProduct.stock === 0 ? "Tạm hết hàng" : "Mua ngay"}
+                  </button>
+                </div>
+                <div className="flex gap-6 mt-5 justify-center">
+                  <span className="flex items-center gap-1.5 text-xs text-slate-500 font-bold"><Check className="w-4 h-4 text-emerald-500" /> Sẵn {selectedProduct.stock} SP</span>
+                  <span className="flex items-center gap-1.5 text-xs text-slate-500 font-bold"><Truck className="w-4 h-4 text-teal-500" /> Freeship toàn quốc</span>
+                </div>
               </div>
             </div>
           </div>
@@ -1747,10 +1730,10 @@ export default function ShopLamDienPage() {
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex justify-end">
           <div className="w-full max-w-md bg-white h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
             <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-white">
-              <h2 className="font-black text-slate-900 uppercase flex items-center gap-2 tracking-wider text-sm"><ShoppingCart className="w-5 h-5 text-teal-700"/> Giỏ Hàng</h2>
+              <h2 className="font-black text-slate-900 uppercase flex items-center gap-2 tracking-wider text-sm"><ShoppingCart className="w-5 h-5 text-teal-700" /> Giỏ Hàng</h2>
               <button onClick={() => setIsCartOpen(false)} className="p-1.5 bg-slate-50 rounded-lg hover:bg-slate-100"><X className="w-5 h-5 text-slate-600" /></button>
             </div>
-            
+
             <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-50/50">
               {cart.length === 0 ? (
                 <div className="text-center mt-20 text-slate-400 font-medium">Giỏ hàng trống. Hãy mua sắm thêm nhé!</div>
@@ -1764,7 +1747,7 @@ export default function ShopLamDienPage() {
                           <h4 className="font-bold text-slate-800 text-sm line-clamp-1">{item.name}</h4>
                           <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md font-bold uppercase mt-1 inline-block">Size: {item.size || "Free"}</span>
                         </div>
-                        <button onClick={() => removeFromCart(item.cartItemId)} className="text-slate-300 hover:text-red-500"><Trash2 className="w-4 h-4"/></button>
+                        <button onClick={() => removeFromCart(item.cartItemId)} className="text-slate-300 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
                       </div>
                       <div className="flex justify-between items-center mt-2">
                         <span className="font-black text-teal-700 text-sm">{formatVND(item.price)}</span>
@@ -1794,20 +1777,20 @@ export default function ShopLamDienPage() {
           <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl relative animate-in zoom-in-95 duration-200">
             <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50 rounded-t-3xl">
               <h2 className="font-black text-slate-800 uppercase flex items-center gap-2">Xác nhận Đặt hàng</h2>
-              <button onClick={() => setIsCheckoutOpen(false)} className="p-2 hover:bg-slate-200 rounded-lg transition-colors"><X className="w-5 h-5 text-slate-600"/></button>
+              <button onClick={() => setIsCheckoutOpen(false)} className="p-2 hover:bg-slate-200 rounded-lg transition-colors"><X className="w-5 h-5 text-slate-600" /></button>
             </div>
-            
+
             <form onSubmit={handleCheckoutSubmit} className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
-              <div><label className="text-xs font-bold text-slate-500 uppercase block mb-1">Người nhận</label><input type="text" required value={checkoutForm.customerName} onChange={e => setCheckoutForm({...checkoutForm, customerName: e.target.value})} className="w-full px-4 py-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white outline-none focus:border-teal-600 font-medium transition-colors" placeholder="Tên người nhận" /></div>
-              <div><label className="text-xs font-bold text-slate-500 uppercase block mb-1">Email</label><input type="email" required value={checkoutForm.customerEmail} onChange={e => setCheckoutForm({...checkoutForm, customerEmail: e.target.value})} className="w-full px-4 py-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white outline-none focus:border-teal-600 font-medium transition-colors" placeholder="Email nhận thông báo" /></div>
-              <div><label className="text-xs font-bold text-slate-500 uppercase block mb-1">Số điện thoại</label><input type="tel" required value={checkoutForm.customerPhone} onChange={e => setCheckoutForm({...checkoutForm, customerPhone: e.target.value})} className="w-full px-4 py-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white outline-none focus:border-teal-600 font-medium transition-colors" placeholder="SĐT liên hệ giao hàng" /></div>
-              <div><label className="text-xs font-bold text-slate-500 uppercase block mb-1">Địa chỉ giao hàng</label><textarea required rows={2} value={checkoutForm.address} onChange={e => setCheckoutForm({...checkoutForm, address: e.target.value})} className="w-full px-4 py-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white outline-none focus:border-teal-600 font-medium transition-colors" placeholder="Số nhà, đường, phường, quận..." /></div>
-              
+              <div><label className="text-xs font-bold text-slate-500 uppercase block mb-1">Người nhận</label><input type="text" required value={checkoutForm.customerName} onChange={e => setCheckoutForm({ ...checkoutForm, customerName: e.target.value })} className="w-full px-4 py-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white outline-none focus:border-teal-600 font-medium transition-colors" placeholder="Tên người nhận" /></div>
+              <div><label className="text-xs font-bold text-slate-500 uppercase block mb-1">Email</label><input type="email" required value={checkoutForm.customerEmail} onChange={e => setCheckoutForm({ ...checkoutForm, customerEmail: e.target.value })} className="w-full px-4 py-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white outline-none focus:border-teal-600 font-medium transition-colors" placeholder="Email nhận thông báo" /></div>
+              <div><label className="text-xs font-bold text-slate-500 uppercase block mb-1">Số điện thoại</label><input type="tel" required value={checkoutForm.customerPhone} onChange={e => setCheckoutForm({ ...checkoutForm, customerPhone: e.target.value })} className="w-full px-4 py-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white outline-none focus:border-teal-600 font-medium transition-colors" placeholder="SĐT liên hệ giao hàng" /></div>
+              <div><label className="text-xs font-bold text-slate-500 uppercase block mb-1">Địa chỉ giao hàng</label><textarea required rows={2} value={checkoutForm.address} onChange={e => setCheckoutForm({ ...checkoutForm, address: e.target.value })} className="w-full px-4 py-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white outline-none focus:border-teal-600 font-medium transition-colors" placeholder="Số nhà, đường, phường, quận..." /></div>
+
               <div className="pt-2">
                 <label className="text-xs font-bold text-slate-500 uppercase block mb-2">Phương thức thanh toán</label>
                 <div className="grid grid-cols-2 gap-3">
-                  <div onClick={() => setCheckoutForm({...checkoutForm, paymentMethod: "COD"})} className={`border-2 rounded-xl p-3 cursor-pointer text-center font-bold text-sm transition-all ${checkoutForm.paymentMethod === 'COD' ? 'border-teal-700 bg-teal-50 text-teal-800 shadow-sm' : 'border-slate-100 text-slate-500 hover:bg-slate-50'}`}>Thanh toán khi nhận (COD)</div>
-                  <div onClick={() => setCheckoutForm({...checkoutForm, paymentMethod: "QR"})} className={`border-2 rounded-xl p-3 cursor-pointer text-center font-bold text-sm transition-all ${checkoutForm.paymentMethod === 'QR' ? 'border-teal-700 bg-teal-50 text-teal-800 shadow-sm' : 'border-slate-100 text-slate-500 hover:bg-slate-50'}`}>Chuyển khoản (Mã QR)</div>
+                  <div onClick={() => setCheckoutForm({ ...checkoutForm, paymentMethod: "COD" })} className={`border-2 rounded-xl p-3 cursor-pointer text-center font-bold text-sm transition-all ${checkoutForm.paymentMethod === 'COD' ? 'border-teal-700 bg-teal-50 text-teal-800 shadow-sm' : 'border-slate-100 text-slate-500 hover:bg-slate-50'}`}>Thanh toán khi nhận (COD)</div>
+                  <div onClick={() => setCheckoutForm({ ...checkoutForm, paymentMethod: "QR" })} className={`border-2 rounded-xl p-3 cursor-pointer text-center font-bold text-sm transition-all ${checkoutForm.paymentMethod === 'QR' ? 'border-teal-700 bg-teal-50 text-teal-800 shadow-sm' : 'border-slate-100 text-slate-500 hover:bg-slate-50'}`}>Chuyển khoản (Mã QR)</div>
                 </div>
               </div>
 
@@ -1815,7 +1798,7 @@ export default function ShopLamDienPage() {
                 <div className="bg-slate-50 p-6 rounded-2xl border-none shadow-inner flex flex-col items-center animate-in fade-in zoom-in-95">
                   {!isQrPaid ? (
                     <>
-                      <p className="text-xs font-black text-slate-700 mb-3 uppercase text-center flex items-center gap-2"><QrCode className="w-4 h-4"/> Quét mã để thanh toán ngay</p>
+                      <p className="text-xs font-black text-slate-700 mb-3 uppercase text-center flex items-center gap-2"><QrCode className="w-4 h-4" /> Quét mã để thanh toán ngay</p>
                       <div className="p-3 bg-white rounded-xl shadow-sm border border-slate-100">
                         <img src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=THANHTOAN_${cartTotal}_${checkoutForm.customerPhone}`} alt="QR Code" className="w-32 h-32 opacity-95" />
                       </div>
@@ -1837,15 +1820,15 @@ export default function ShopLamDienPage() {
               )}
 
               <div className="bg-teal-50 p-5 rounded-2xl flex justify-between items-center border-none shadow-sm mt-4">
-                 <span className="font-bold text-teal-800 text-sm uppercase tracking-wider">Tổng thanh toán:</span><span className="text-2xl font-black text-teal-700">{formatVND(cartTotal)}</span>
+                <span className="font-bold text-teal-800 text-sm uppercase tracking-wider">Tổng thanh toán:</span><span className="text-2xl font-black text-teal-700">{formatVND(cartTotal)}</span>
               </div>
-              
-              <button 
-                type="submit" 
+
+              <button
+                type="submit"
                 disabled={(checkoutForm.paymentMethod === 'QR' && !isQrPaid) || isCheckoutSubmitting}
                 className="w-full py-4 mt-4 bg-slate-900 hover:bg-teal-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-black rounded-xl uppercase transition-colors shadow-lg shadow-slate-900/20 tracking-widest flex items-center justify-center gap-2"
               >
-                {isCheckoutSubmitting ? <Loader2 className="w-5 h-5 animate-spin"/> : (checkoutForm.paymentMethod === 'QR' && !isQrPaid ? 'Vui lòng thanh toán QR để tiếp tục' : 'Hoàn Tất Đặt Hàng')}
+                {isCheckoutSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : (checkoutForm.paymentMethod === 'QR' && !isQrPaid ? 'Vui lòng thanh toán QR để tiếp tục' : 'Hoàn Tất Đặt Hàng')}
               </button>
             </form>
           </div>
@@ -1857,7 +1840,7 @@ export default function ShopLamDienPage() {
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl relative animate-in zoom-in-95 duration-200 overflow-hidden">
             <button onClick={() => setIsAuthModalOpen(false)} className="absolute top-4 right-4 p-2 bg-slate-50 hover:bg-slate-200 rounded-lg z-10 transition-colors"><X className="w-5 h-5 text-slate-600" /></button>
-            
+
             <div className="p-8">
               <h2 className="text-2xl font-black text-slate-900 mb-2 uppercase text-center">{isLoginMode ? 'Đăng nhập' : 'Tạo tài khoản'}</h2>
               <p className="text-sm text-slate-500 text-center mb-6 font-medium">
@@ -1871,25 +1854,25 @@ export default function ShopLamDienPage() {
                   <>
                     <div>
                       <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Họ và tên</label>
-                      <input type="text" required value={authForm.name} onChange={e => setAuthForm({...authForm, name: e.target.value})} className="w-full px-4 py-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white outline-none focus:border-teal-600 transition-colors font-medium" placeholder="Nguyễn Văn A" />
+                      <input type="text" required value={authForm.name} onChange={e => setAuthForm({ ...authForm, name: e.target.value })} className="w-full px-4 py-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white outline-none focus:border-teal-600 transition-colors font-medium" placeholder="Nguyễn Văn A" />
                     </div>
                     <div>
                       <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Số điện thoại</label>
-                      <input type="tel" required value={authForm.phone} onChange={e => setAuthForm({...authForm, phone: e.target.value})} className="w-full px-4 py-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white outline-none focus:border-teal-600 transition-colors font-medium" placeholder="0912345678" />
+                      <input type="tel" required value={authForm.phone} onChange={e => setAuthForm({ ...authForm, phone: e.target.value })} className="w-full px-4 py-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white outline-none focus:border-teal-600 transition-colors font-medium" placeholder="0912345678" />
                     </div>
                   </>
                 )}
                 <div>
                   <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Email</label>
-                  <input type="email" required value={authForm.email} onChange={e => setAuthForm({...authForm, email: e.target.value})} className="w-full px-4 py-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white outline-none focus:border-teal-600 transition-colors font-medium" placeholder="email@example.com" />
+                  <input type="email" required value={authForm.email} onChange={e => setAuthForm({ ...authForm, email: e.target.value })} className="w-full px-4 py-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white outline-none focus:border-teal-600 transition-colors font-medium" placeholder="email@example.com" />
                 </div>
                 <div>
                   <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Mật khẩu</label>
-                  <input type="password" required value={authForm.password} onChange={e => setAuthForm({...authForm, password: e.target.value})} className="w-full px-4 py-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white outline-none focus:border-teal-600 transition-colors font-medium" placeholder="••••••••" />
+                  <input type="password" required value={authForm.password} onChange={e => setAuthForm({ ...authForm, password: e.target.value })} className="w-full px-4 py-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white outline-none focus:border-teal-600 transition-colors font-medium" placeholder="••••••••" />
                 </div>
 
                 <button type="submit" disabled={isAuthSubmitting} className="w-full py-4 mt-2 bg-slate-900 hover:bg-teal-700 disabled:bg-slate-300 text-white font-black rounded-xl uppercase transition-colors shadow-lg shadow-slate-900/20 tracking-widest flex items-center justify-center gap-2">
-                  {isAuthSubmitting ? <Loader2 className="w-5 h-5 animate-spin"/> : (isLoginMode ? 'Đăng nhập ngay' : 'Đăng ký tài khoản')}
+                  {isAuthSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : (isLoginMode ? 'Đăng nhập ngay' : 'Đăng ký tài khoản')}
                 </button>
               </form>
 
@@ -1917,70 +1900,70 @@ export default function ShopLamDienPage() {
       {/* ==================== MODAL: HỒ SƠ ==================== */}
       {isReviewModalOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[300] flex items-center justify-center p-4" onClick={(e) => { if (e.target === e.currentTarget) setIsReviewModalOpen(false); }}>
-           <div className="bg-white w-full max-w-md rounded-2xl overflow-hidden shadow-2xl relative animate-in fade-in zoom-in duration-300">
-             <div className="p-6">
-                <button onClick={() => setIsReviewModalOpen(false)} className="absolute top-4 right-4 p-2 bg-slate-50 hover:bg-slate-200 rounded-lg z-10 transition-colors"><X className="w-5 h-5 text-slate-600" /></button>
-                <h3 className="font-black text-xl text-slate-900 mb-2">Đánh giá sản phẩm</h3>
-                <p className="text-sm font-semibold text-slate-500 mb-6">{reviewForm.productName}</p>
-                <form onSubmit={handleReviewSubmit} className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">Chất lượng sản phẩm</label>
-                    <div className="flex gap-2">
-                      {[1, 2, 3, 4, 5].map(star => (
-                        <button type="button" key={star} onClick={() => setReviewForm(prev => ({...prev, rating: star}))} className="p-1 transition-transform hover:scale-110 active:scale-95">
-                          <Star className={`w-8 h-8 ${reviewForm.rating >= star ? 'fill-amber-400 text-amber-400' : 'text-slate-300'}`} />
-                        </button>
-                      ))}
-                    </div>
+          <div className="bg-white w-full max-w-md rounded-2xl overflow-hidden shadow-2xl relative animate-in fade-in zoom-in duration-300">
+            <div className="p-6">
+              <button onClick={() => setIsReviewModalOpen(false)} className="absolute top-4 right-4 p-2 bg-slate-50 hover:bg-slate-200 rounded-lg z-10 transition-colors"><X className="w-5 h-5 text-slate-600" /></button>
+              <h3 className="font-black text-xl text-slate-900 mb-2">Đánh giá sản phẩm</h3>
+              <p className="text-sm font-semibold text-slate-500 mb-6">{reviewForm.productName}</p>
+              <form onSubmit={handleReviewSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-2">Chất lượng sản phẩm</label>
+                  <div className="flex gap-2">
+                    {[1, 2, 3, 4, 5].map(star => (
+                      <button type="button" key={star} onClick={() => setReviewForm(prev => ({ ...prev, rating: star }))} className="p-1 transition-transform hover:scale-110 active:scale-95">
+                        <Star className={`w-8 h-8 ${reviewForm.rating >= star ? 'fill-amber-400 text-amber-400' : 'text-slate-300'}`} />
+                      </button>
+                    ))}
                   </div>
-                  <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">Bình luận</label>
-                    <textarea 
-                      required 
-                      value={reviewForm.comment} 
-                      onChange={e => setReviewForm(prev => ({...prev, comment: e.target.value}))} 
-                      className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-3 text-sm font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:border-teal-500 transition-colors min-h-[100px]" 
-                      placeholder="Chia sẻ cảm nhận của bạn về sản phẩm..."
-                    />
-                  </div>
-                  <button type="submit" disabled={isSubmittingReview} className="w-full bg-teal-700 hover:bg-teal-800 text-white font-black text-sm uppercase py-4 rounded-xl flex items-center justify-center gap-2 transition-colors disabled:opacity-70 disabled:cursor-not-allowed">
-                    {isSubmittingReview ? <Loader2 className="w-5 h-5 animate-spin" /> : <><CheckCircle2 className="w-5 h-5" /> Gửi đánh giá</>}
-                  </button>
-                </form>
-             </div>
-           </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-2">Bình luận</label>
+                  <textarea
+                    required
+                    value={reviewForm.comment}
+                    onChange={e => setReviewForm(prev => ({ ...prev, comment: e.target.value }))}
+                    className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-3 text-sm font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:border-teal-500 transition-colors min-h-[100px]"
+                    placeholder="Chia sẻ cảm nhận của bạn về sản phẩm..."
+                  />
+                </div>
+                <button type="submit" disabled={isSubmittingReview} className="w-full bg-teal-700 hover:bg-teal-800 text-white font-black text-sm uppercase py-4 rounded-xl flex items-center justify-center gap-2 transition-colors disabled:opacity-70 disabled:cursor-not-allowed">
+                  {isSubmittingReview ? <Loader2 className="w-5 h-5 animate-spin" /> : <><CheckCircle2 className="w-5 h-5" /> Gửi đánh giá</>}
+                </button>
+              </form>
+            </div>
+          </div>
         </div>
       )}
 
       {isProfileModalOpen && currentUser && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl relative animate-in zoom-in-95 duration-200 overflow-hidden">
-             <button onClick={() => setIsProfileModalOpen(false)} className="absolute top-4 right-4 p-2 bg-slate-50 hover:bg-slate-200 rounded-lg z-10 transition-colors"><X className="w-5 h-5 text-slate-600" /></button>
-             <div className="p-8 text-center">
-                <div className="w-20 h-20 bg-teal-100 text-teal-800 rounded-2xl flex items-center justify-center font-black text-3xl shadow-sm mx-auto mb-5 rotate-3">
-                  {currentUser.name.charAt(0).toUpperCase()}
-                </div>
-                <h3 className="font-black text-xl text-slate-900 mb-1">{currentUser.name}</h3>
-                <p className="text-sm font-semibold text-slate-500 mb-6">{currentUser.email}</p>
-                
-                <form onSubmit={handleUpdateProfile} className="text-left space-y-4 mb-8">
-                  <div>
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Số điện thoại</label>
-                    <input type="tel" required value={profileForm.phone} onChange={e => setProfileForm({...profileForm, phone: e.target.value})} className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium focus:border-teal-600 outline-none transition-colors" />
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Địa chỉ</label>
-                    <textarea required value={profileForm.address} onChange={e => setProfileForm({...profileForm, address: e.target.value})} className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium focus:border-teal-600 outline-none transition-colors" rows={2} />
-                  </div>
-                  <button type="submit" disabled={isProfileSubmitting} className="w-full py-3.5 bg-teal-700 hover:bg-teal-800 disabled:bg-slate-300 text-white font-black tracking-widest uppercase rounded-xl text-xs transition-colors shadow-md flex justify-center items-center gap-2">
-                    {isProfileSubmitting ? <Loader2 className="w-4 h-4 animate-spin"/> : 'Lưu Thông Tin'}
-                  </button>
-                </form>
+            <button onClick={() => setIsProfileModalOpen(false)} className="absolute top-4 right-4 p-2 bg-slate-50 hover:bg-slate-200 rounded-lg z-10 transition-colors"><X className="w-5 h-5 text-slate-600" /></button>
+            <div className="p-8 text-center">
+              <div className="w-20 h-20 bg-teal-100 text-teal-800 rounded-2xl flex items-center justify-center font-black text-3xl shadow-sm mx-auto mb-5 rotate-3">
+                {currentUser.name.charAt(0).toUpperCase()}
+              </div>
+              <h3 className="font-black text-xl text-slate-900 mb-1">{currentUser.name}</h3>
+              <p className="text-sm font-semibold text-slate-500 mb-6">{currentUser.email}</p>
 
-                <button onClick={handleLogout} className="w-full py-3.5 bg-red-50 hover:bg-red-100 text-red-600 font-black rounded-xl uppercase tracking-widest text-xs transition-colors flex items-center justify-center gap-2">
-                  <LogOut className="w-4 h-4" /> Đăng xuất
+              <form onSubmit={handleUpdateProfile} className="text-left space-y-4 mb-8">
+                <div>
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Số điện thoại</label>
+                  <input type="tel" required value={profileForm.phone} onChange={e => setProfileForm({ ...profileForm, phone: e.target.value })} className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium focus:border-teal-600 outline-none transition-colors" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Địa chỉ</label>
+                  <textarea required value={profileForm.address} onChange={e => setProfileForm({ ...profileForm, address: e.target.value })} className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium focus:border-teal-600 outline-none transition-colors" rows={2} />
+                </div>
+                <button type="submit" disabled={isProfileSubmitting} className="w-full py-3.5 bg-teal-700 hover:bg-teal-800 disabled:bg-slate-300 text-white font-black tracking-widest uppercase rounded-xl text-xs transition-colors shadow-md flex justify-center items-center gap-2">
+                  {isProfileSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Lưu Thông Tin'}
                 </button>
-             </div>
+              </form>
+
+              <button onClick={handleLogout} className="w-full py-3.5 bg-red-50 hover:bg-red-100 text-red-600 font-black rounded-xl uppercase tracking-widest text-xs transition-colors flex items-center justify-center gap-2">
+                <LogOut className="w-4 h-4" /> Đăng xuất
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1990,7 +1973,7 @@ export default function ShopLamDienPage() {
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden relative animate-in zoom-in-95 duration-200">
             <div className="p-6 bg-slate-900 text-white flex justify-between items-center">
-              <h3 className="font-black uppercase tracking-wider text-sm flex items-center gap-2"><Ruler className="w-4 h-4 text-teal-400"/> Bảng Quy Đổi Size</h3>
+              <h3 className="font-black uppercase tracking-wider text-sm flex items-center gap-2"><Ruler className="w-4 h-4 text-teal-400" /> Bảng Quy Đổi Size</h3>
               <button onClick={() => setIsSizeGuideOpen(false)} className="p-1.5 hover:bg-slate-700 rounded-lg transition-colors"><X className="w-5 h-5" /></button>
             </div>
             <div className="p-6">
@@ -2028,7 +2011,7 @@ export default function ShopLamDienPage() {
 
         <div className="max-w-7xl mx-auto px-4">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10 mb-12">
-            
+
             {/* Brand Intro */}
             <div className="space-y-4">
               <div className="flex items-center gap-3">
@@ -2039,7 +2022,7 @@ export default function ShopLamDienPage() {
                 </div>
               </div>
               <p className="text-xs text-slate-400 leading-relaxed font-medium">
-                Thương hiệu giày dép Việt Nam chất lượng cao. Chúng tôi cam kết mang đến những sản phẩm êm ái, bền bỉ và tôn vinh phong cách người Việt.
+                Thương hiệu giày dép Việt Nam chất lượng cao. Chúng tôi cam kết mang đến những sản phẩm êm ái, bền bỉ và tôn vinh phong cách người Việt
               </p>
               <div className="flex items-center gap-2 pt-2">
                 <span className="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 text-[10px] font-bold text-teal-400 flex items-center gap-1">
@@ -2072,7 +2055,7 @@ export default function ShopLamDienPage() {
               <ul className="space-y-3 text-xs font-medium text-slate-400">
                 <li className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-teal-400 flex-shrink-0">
-                    <Phone className="w-4 h-4"/>
+                    <Phone className="w-4 h-4" />
                   </div>
                   <div>
                     <p className="text-[10px] text-slate-500 font-bold uppercase">Tổng đài CSKH</p>
@@ -2081,7 +2064,7 @@ export default function ShopLamDienPage() {
                 </li>
                 <li className="flex items-start gap-3">
                   <div className="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-teal-400 flex-shrink-0 mt-0.5">
-                    <MapPin className="w-4 h-4"/>
+                    <MapPin className="w-4 h-4" />
                   </div>
                   <div>
                     <p className="text-[10px] text-slate-500 font-bold uppercase">Địa chỉ cửa hàng</p>
