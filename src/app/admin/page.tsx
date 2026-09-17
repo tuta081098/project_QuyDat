@@ -24,6 +24,7 @@ export default function AdminDashboardPage() {
   const [orders, setOrders] = useState<any[]>([]);
   const [selectedOrderDetails, setSelectedOrderDetails] = useState<any>(null);
   const [customers, setCustomers] = useState<any[]>([]);
+  const [reviews, setReviews] = useState<any[]>([]);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [uploadProgressText, setUploadProgressText] = useState("");
 
