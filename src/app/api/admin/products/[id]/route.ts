@@ -8,7 +8,41 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const { id } = await params; 
     
     const body = await request.json();
-    const { name, slug, price, discountPrice, stock, categoryId, status, image, sizes, description } = body;
+    const { name, slug, categoryId, status, image, images, sizes, description, colorVariants } = body;
+
+    const finalImages: string[] = Array.isArray(images)
+      ? images.filter(Boolean)
+      : (image ? [image] : []);
+    const primaryImage = finalImages[0] || image || "";
+
+    // Tính giá và tồn kho tổng hợp từ các biến thể màu
+    let price = 0;
+    let discountPrice: number | null = null;
+    let stock = 0;
+    let computedSizes = sizes || [];
+
+    let normalizedVariants = colorVariants;
+    if (colorVariants && Array.isArray(colorVariants) && colorVariants.length > 0) {
+      price = colorVariants[0].price || 0;
+      discountPrice = colorVariants[0].discountPrice || null;
+
+      // Chuẩn hóa tồn kho từng variant nếu có sizeStocks
+      normalizedVariants = colorVariants.map((v: any) => {
+        if (v.sizeStocks && typeof v.sizeStocks === 'object' && Object.keys(v.sizeStocks).length > 0) {
+          const totalSizeStock = Object.values(v.sizeStocks).reduce((sum: number, cur: any) => sum + (Number(cur) || 0), 0);
+          return { ...v, stock: totalSizeStock };
+        }
+        return v;
+      });
+
+      stock = normalizedVariants.reduce((sum: number, v: any) => sum + (Number(v.stock) || 0), 0);
+
+      // Tổng hợp sizes từ tất cả biến thể màu
+      const allVariantSizes = normalizedVariants.flatMap((v: any) => Array.isArray(v.sizes) ? v.sizes : (v.sizes ? v.sizes.split(',').map((s: string) => s.trim()).filter(Boolean) : []));
+      if (allVariantSizes.length > 0) {
+        computedSizes = Array.from(new Set(allVariantSizes));
+      }
+    }
 
     const product = await prisma.product.update({
       where: { id },
@@ -20,10 +54,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         stock,
         categoryId,
         status,
-        image,
-        sizes,
-        description
-      }
+        image: primaryImage,
+        images: finalImages,
+        sizes: computedSizes,
+        description,
+        colorVariants: normalizedVariants || []
+      } as any
     });
     return NextResponse.json(product);
   } catch (error) {
