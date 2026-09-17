@@ -17,12 +17,23 @@ export async function GET() {
 export async function PATCH(request: Request) {
   try {
     const body = await request.json();
-    const { id, status } = body;
+    const { id, status, paymentStatus } = body;
+
+    const updateData: any = {};
+    if (status) {
+      updateData.status = status;
+      if (status === 'DELIVERED') {
+        updateData.paymentStatus = 'PAID';
+      }
+    }
+    if (paymentStatus) {
+      updateData.paymentStatus = paymentStatus;
+    }
 
     // Cập nhật trạng thái đơn hàng trong Database
     const updatedOrder = await prisma.order.update({
       where: { id },
-      data: { status }
+      data: updateData
     });
 
     return NextResponse.json({ success: true, data: updatedOrder });

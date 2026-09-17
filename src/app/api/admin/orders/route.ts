@@ -20,7 +20,13 @@ export async function PATCH(request: Request) {
     const { id, status, paymentStatus } = body;
 
     const updateData: any = {};
-    if (status) updateData.status = status;
+    if (status) {
+      updateData.status = status;
+      // Khi cập nhật trạng thái đã giao (DELIVERED) thì mặc định là đã thanh toán (PAID)
+      if (status === 'DELIVERED') {
+        updateData.paymentStatus = 'PAID';
+      }
+    }
     if (paymentStatus) updateData.paymentStatus = paymentStatus;
 
     // Cập nhật trạng thái đơn hàng hoặc thanh toán trong Database
