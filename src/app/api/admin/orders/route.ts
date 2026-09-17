@@ -17,16 +17,26 @@ export async function GET() {
 export async function PATCH(request: Request) {
   try {
     const body = await request.json();
-    const { id, status } = body;
+    const { id, status, paymentStatus } = body;
 
-    // Cập nhật trạng thái đơn hàng trong Database
+    const updateData: any = {};
+    if (status) {
+      updateData.status = status;
+      // Khi cập nhật trạng thái đã giao (DELIVERED) thì mặc định là đã thanh toán (PAID)
+      if (status === 'DELIVERED') {
+        updateData.paymentStatus = 'PAID';
+      }
+    }
+    if (paymentStatus) updateData.paymentStatus = paymentStatus;
+
+    // Cập nhật trạng thái đơn hàng hoặc thanh toán trong Database
     const updatedOrder = await prisma.order.update({
       where: { id },
-      data: { status }
+      data: updateData
     });
 
     return NextResponse.json({ success: true, data: updatedOrder });
   } catch (error) {
-    return NextResponse.json({ error: 'Lỗi cập nhật trạng thái đơn hàng' }, { status: 500 });
+    return NextResponse.json({ error: 'Lỗi cập nhật đơn hàng' }, { status: 500 });
   }
 }

@@ -96,6 +96,7 @@ model User {
   image         String?   // Lưu avatar từ Google
   phone         String?
   address       String?
+  addresses     Json?     // Danh sách địa chỉ: [{ id, recipientName, recipientPhone, address, label, isDefault }]
   role          String    @default("USER") 
   status        String    @default("ACTIVE") 
   
@@ -153,12 +154,17 @@ model Product {
   slug          String      @unique
   sizes         String[]    
   image         String?
+  images        String[]    @default([])
   status        String      @default("ACTIVE") 
   
   price         Int
   discountPrice Int?
   stock         Int         @default(0)
   description   String?
+
+  // Biến thể màu sắc (embedded JSON array)
+  // Mỗi phần tử: { colorName, colorCode, price, discountPrice?, stock, image? }
+  colorVariants Json?
 
   categoryId    String      @db.ObjectId
   category      Category    @relation(fields: [categoryId], references: [id])
@@ -177,6 +183,9 @@ model Order {
   customerEmail String
   customerPhone String
   address       String
+  note          String?   // Ghi chú giao hàng
+  shippingDetails Json?   // Chi tiết giao nhận mở rộng: { recipientName, recipientPhone, address, label, note }
+  userId        String?   @db.ObjectId
   totalAmount   Int
   status        String      @default("PENDING") // PENDING, CONFIRMED, SHIPPED, DELIVERED, CANCELLED
   
@@ -195,6 +204,8 @@ model OrderItem {
   price       Int         // Snapshot: Giá tại thời điểm mua
   productName String      // Snapshot: Tên sản phẩm lúc mua
   size        String?     // Kích cỡ khách chọn
+  color       String?     // Snapshot: Màu sắc khách chọn
+  image       String?     // Snapshot: Ảnh sản phẩm lúc mua
   
   orderId     String   @db.ObjectId
   order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)

@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Search, ShoppingCart, User, MapPin, Phone, Loader2, X, Check, Truck, Ruler, LogOut, CheckCircle2, AlertCircle, ChevronRight, ChevronLeft, Trash2, QrCode, PackageSearch, Package, Star,
-  Sparkles, ShieldCheck, RefreshCw, Headphones, ArrowUp, Heart, Flame, Eye, Tag, Menu, SlidersHorizontal, Filter, Smartphone
+  Sparkles, ShieldCheck, RefreshCw, Headphones, ArrowUp, Heart, Flame, Eye, Tag, Menu, SlidersHorizontal, Filter, Smartphone, Minus, Plus, Images,
+  Home, Building2, Edit3, FileText
 } from "lucide-react";
 import Link from "next/link";
 import { signIn, signOut, getSession } from "next-auth/react";
@@ -23,6 +24,191 @@ const normalizeVietnamese = (text: string) => {
     .toLowerCase()
     .trim();
 };
+
+function ProductCard({
+  prod,
+  formatVND,
+  onOpenDetail
+}: {
+  prod: any;
+  formatVND: (num: number) => string;
+  onOpenDetail: (product: any, initialColor?: string) => void;
+}) {
+  const cardVariants = (prod.colorVariants && Array.isArray(prod.colorVariants)) ? prod.colorVariants as any[] : [];
+  const [previewVariant, setPreviewVariant] = useState<any>(null);
+
+  const currentVar = previewVariant || cardVariants[0] || null;
+  const cardPrice = currentVar?.price || prod.price;
+  const cardDiscount = currentVar?.discountPrice || prod.discountPrice;
+  const isSale = cardDiscount && cardDiscount > 0;
+  const percentOff = isSale ? Math.round(((cardPrice - cardDiscount) / cardPrice) * 100) : 0;
+  const prodImages: string[] = (prod.images && Array.isArray(prod.images) && prod.images.length > 0)
+    ? prod.images
+    : (prod.image ? [prod.image] : []);
+  const primaryImage = prodImages[0] || prod.image || cardVariants[0]?.image || "";
+  // Ngoài danh sách màn hình luôn hiển thị ảnh chính, chỉ đổi ảnh khi rê chuột vào chấm màu
+  const displayImage = previewVariant?.image || primaryImage || "https://images.unsplash.com/photo-1608231387042-66d1773070a5?auto=format&fit=crop&q=80&w=400";
+  const displayStock = currentVar ? currentVar.stock : prod.stock;
+
+  const ratingAvg = prod.reviews && prod.reviews.length > 0
+    ? (prod.reviews.reduce((acc: number, r: any) => acc + r.rating, 0) / prod.reviews.length).toFixed(1)
+    : null;
+
+  const handleOpen = (colorName?: string) => {
+    onOpenDetail(prod, colorName);
+  };
+
+  return (
+    <div className="group bg-white rounded-3xl overflow-hidden border border-slate-100 shadow-[0_4px_20px_rgb(0,0,0,0.03)] hover:shadow-xl hover:border-teal-200/80 hover:-translate-y-1.5 transition-all duration-300 flex flex-col relative">
+      {/* Sale & Tag Badges */}
+      <div className="absolute top-3 left-3 z-10 flex flex-col gap-1.5 pointer-events-none">
+        {isSale && (
+          <span className="bg-gradient-to-r from-red-500 to-rose-600 text-white text-[10px] font-black px-2.5 py-1 rounded-lg uppercase shadow-md shadow-red-500/20 flex items-center gap-1">
+            <Flame className="w-3 h-3 text-amber-300" /> -{percentOff}%
+          </span>
+        )}
+        {displayStock > 0 && displayStock <= 3 && (
+          <span className="bg-amber-500 text-white text-[9px] font-black px-2 py-0.5 rounded-md uppercase shadow-sm">
+            Sắp hết
+          </span>
+        )}
+      </div>
+
+      {/* Out of Stock Mask */}
+      {displayStock === 0 && (
+        <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-[2px] z-20 flex items-center justify-center p-4">
+          <span className="bg-slate-900 text-white font-black px-4 py-2 rounded-xl uppercase tracking-widest text-[11px] shadow-xl border border-slate-700">
+            TẠM HẾT HÀNG
+          </span>
+        </div>
+      )}
+
+      {/* Image Frame */}
+      <div
+        className="aspect-[4/3] bg-gradient-to-b from-slate-50 to-slate-100/60 flex justify-center items-center cursor-pointer p-6 relative overflow-hidden"
+        onClick={() => handleOpen()}
+      >
+        <img
+          src={displayImage}
+          alt={prod.name}
+          className="w-full h-full object-contain mix-blend-multiply group-hover:scale-110 transition-transform duration-500 ease-out"
+        />
+
+        {/* Multi-image count badge */}
+        {prodImages.length > 1 && (
+          <div className="absolute bottom-3 right-3 z-10 bg-slate-900/60 backdrop-blur-sm text-white text-[10px] font-bold px-2 py-0.5 rounded-lg flex items-center gap-1 shadow-sm pointer-events-none">
+            <Images className="w-3 h-3 text-white/80" />
+            <span>{prodImages.length} ảnh</span>
+          </div>
+        )}
+
+        {/* Quick View Button on Hover */}
+        <div className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+          <span className="px-3 py-1.5 bg-white/90 backdrop-blur-sm rounded-xl text-[11px] font-black text-slate-800 shadow-md flex items-center gap-1.5 transform translate-y-2 group-hover:translate-y-0 transition-transform">
+            <Eye className="w-3.5 h-3.5 text-teal-700" /> Xem chi tiết
+          </span>
+        </div>
+      </div>
+
+      {/* Details Section */}
+      <div className="p-4 sm:p-5 flex flex-col flex-1">
+
+        {/* Title */}
+        <h3
+          className="font-bold text-slate-800 text-xs sm:text-sm mb-1.5 group-hover:text-teal-700 transition-colors line-clamp-2 cursor-pointer leading-snug"
+          onClick={() => handleOpen()}
+        >
+          {prod.name}
+        </h3>
+
+        {/* Color Dots with Hover Preview */}
+        {cardVariants.length > 0 && (
+          <div className="flex items-center gap-1.5 mb-2">
+            {cardVariants.slice(0, 6).map((v: any, i: number) => {
+              const isHovered = previewVariant?.colorName === v.colorName;
+              const vSizes = v.sizes
+                ? (Array.isArray(v.sizes) ? v.sizes : v.sizes.split(',').map((s: string) => s.trim()).filter(Boolean))
+                : (prod.sizes || []);
+              const sizesLabel = (() => {
+                if (v.sizeStocks && typeof v.sizeStocks === 'object' && Object.keys(v.sizeStocks).length > 0) {
+                  return ' | ' + Object.entries(v.sizeStocks).map(([sz, qty]) => `${sz}(${qty})`).join(', ');
+                }
+                return vSizes.length > 0 ? ` | Size: ${vSizes.join(', ')}` : '';
+              })();
+              return (
+                <div
+                  key={i}
+                  className={`w-4 h-4 rounded-full border-2 transition-all cursor-pointer ${isHovered
+                      ? 'border-teal-600 ring-2 ring-teal-600/30 scale-125'
+                      : 'border-white shadow-xs hover:scale-125'
+                    }`}
+                  style={{ backgroundColor: v.colorCode || '#ccc' }}
+                  title={`${v.colorName} - ${v.stock > 0 ? (v.discountPrice ? `${formatVND(v.discountPrice)} (Gốc: ${formatVND(v.price)})` : formatVND(v.price)) : 'Hết hàng'}${sizesLabel}`}
+                  onMouseEnter={() => setPreviewVariant(v)}
+                  onMouseLeave={() => setPreviewVariant(null)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleOpen(v.colorName);
+                  }}
+                />
+              );
+            })}
+            {cardVariants.length > 6 && (
+              <span className="text-[9px] text-slate-400 font-bold">+{cardVariants.length - 6}</span>
+            )}
+            {previewVariant && (
+              <span className="text-[10px] text-teal-700 font-bold ml-1 animate-in fade-in truncate max-w-[80px]">
+                {previewVariant.colorName}
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Rating Stars & Count */}
+        <div className="flex items-center gap-1.5 mb-3 min-h-[16px]">
+          {ratingAvg ? (
+            <div className="flex items-center gap-1">
+              <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+              <span className="text-xs font-black text-slate-700">{ratingAvg}</span>
+              <span className="text-[10px] text-slate-400 font-semibold">({prod.reviews.length})</span>
+            </div>
+          ) : (
+            <span className="text-[10px] text-slate-400 font-medium">Chưa có đánh giá</span>
+          )}
+        </div>
+
+        {/* Price Display (dynamic based on variant) */}
+        <div className="mt-auto mb-3.5">
+          {isSale ? (
+            <div className="flex items-baseline gap-2">
+              <span className="text-red-600 font-black text-base sm:text-lg leading-none">
+                {formatVND(cardDiscount)}
+              </span>
+              <span className="text-slate-400 line-through text-xs font-semibold">
+                {formatVND(cardPrice)}
+              </span>
+            </div>
+          ) : (
+            <div className="text-slate-900 font-black text-base sm:text-lg leading-none">
+              {formatVND(cardPrice)}
+            </div>
+          )}
+        </div>
+
+        {/* Add to Cart Button */}
+        <button
+          disabled={displayStock === 0}
+          onClick={() => handleOpen()}
+          className="w-full py-3 bg-slate-50 hover:bg-teal-700 text-slate-700 hover:text-white disabled:bg-slate-50 disabled:text-slate-300 text-[11px] font-black uppercase rounded-xl transition-all duration-200 tracking-wider flex items-center justify-center gap-1.5 border border-slate-200/70 hover:border-teal-700 shadow-sm"
+        >
+          <ShoppingCart className="w-3.5 h-3.5" />
+          {displayStock === 0 ? "Hết hàng" : "Chọn mua"}
+        </button>
+
+      </div>
+    </div>
+  );
+}
 
 export default function ShopLamDienPage() {
   const [categories, setCategories] = useState<any[]>([]);
@@ -57,11 +243,41 @@ export default function ShopLamDienPage() {
   const [expandedDrawerCategory, setExpandedDrawerCategory] = useState<string | null>(null);
 
   const [currentPage, setCurrentPage] = useState<number>(1);
-  useEffect(() => { setCurrentPage(1); }, [activeHeaderTab, activeSubCategory, searchQuery, selectedSize, priceRange, quickFilter]);
+  useEffect(() => { setCurrentPage(1); }, [activeHeaderTab, activeSubCategory, searchQuery, selectedSize, selectedFilterColor, priceRange, quickFilter]);
 
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const [popupSize, setPopupSize] = useState<string>("");
+  const [selectedColor, setSelectedColor] = useState<string>(""); // Tên màu đang chọn trong popup
+  const [popupQuantity, setPopupQuantity] = useState<number>(1); // Số lượng mua trong popup
+  const [popupActiveImage, setPopupActiveImage] = useState<string | null>(null); // Ảnh đang được chọn xem phóng to
   const [isSizeGuideOpen, setIsSizeGuideOpen] = useState(false);
+
+  // Helper: Chọn màu trong popup và cập nhật danh sách size khả dụng
+  const handleSelectColorInPopup = (product: any, colorName: string) => {
+    setSelectedColor(colorName);
+    setPopupQuantity(1);
+    const variants = (product?.colorVariants && Array.isArray(product.colorVariants)) ? product.colorVariants as any[] : [];
+    const targetVar = colorName ? variants.find((v: any) => v.colorName === colorName) : null;
+    if (targetVar?.image) {
+      setPopupActiveImage(targetVar.image);
+    }
+    const targetSizes = targetVar?.sizes
+      ? (Array.isArray(targetVar.sizes) ? targetVar.sizes : targetVar.sizes.split(',').map((s: string) => s.trim()).filter(Boolean))
+      : (product?.sizes || []);
+
+    if (targetSizes.length > 0) {
+      if (!popupSize || !targetSizes.includes(popupSize)) {
+        // Ưu tiên chọn size còn hàng
+        const inStockSize = targetSizes.find((sz: string) => {
+          if (!targetVar?.sizeStocks || targetVar.sizeStocks[sz] === undefined) return true;
+          return Number(targetVar.sizeStocks[sz]) > 0;
+        });
+        setPopupSize(inStockSize || targetSizes[0]);
+      }
+    } else {
+      setPopupSize("");
+    }
+  };
 
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -70,6 +286,22 @@ export default function ShopLamDienPage() {
   const [authError, setAuthError] = useState<string>("");
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [profileForm, setProfileForm] = useState({ name: "", phone: "", address: "" });
+  const [profileActiveTab, setProfileActiveTab] = useState<'INFO' | 'ADDRESSES'>('INFO');
+
+  // --- SỔ ĐỊA CHỈ GIAO HÀNG & MODAL THÊM/SỬA ĐỊA CHỈ ---
+  const [selectedAddressId, setSelectedAddressId] = useState<string>("");
+  const [isAddingNewAddress, setIsAddingNewAddress] = useState(false);
+  const [saveAddressToBook, setSaveAddressToBook] = useState(true);
+  const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
+  const [addressModalForm, setAddressModalForm] = useState({
+    id: "",
+    recipientName: "",
+    recipientPhone: "",
+    address: "",
+    label: "Nhà riêng",
+    isDefault: false
+  });
+  const [isAddressSubmitting, setIsAddressSubmitting] = useState(false);
 
   const [cart, setCart] = useState<any[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -140,6 +372,25 @@ export default function ShopLamDienPage() {
 
   const formatVND = (num: number) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(num);
 
+  const availableColors = useMemo(() => {
+    const map = new Map<string, { name: string; code: string; count: number }>();
+    products.forEach(p => {
+      if (p.colorVariants && Array.isArray(p.colorVariants)) {
+        p.colorVariants.forEach((v: any) => {
+          if (v.colorName && v.colorName.trim()) {
+            const key = v.colorName.trim().toLowerCase();
+            if (!map.has(key)) {
+              map.set(key, { name: v.colorName.trim(), code: v.colorCode || '#000000', count: 1 });
+            } else {
+              map.get(key)!.count += 1;
+            }
+          }
+        });
+      }
+    });
+    return Array.from(map.values());
+  }, [products]);
+
   const handleAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError("");
@@ -197,8 +448,209 @@ export default function ShopLamDienPage() {
   };
 
   const openProfile = () => {
-    setProfileForm({ name: currentUser.name, phone: currentUser.phone || "", address: currentUser.address || "" });
+    setProfileForm({ name: currentUser?.name || "", phone: currentUser?.phone || "", address: currentUser?.address || "" });
+    setProfileActiveTab('INFO');
     setIsProfileModalOpen(true);
+  };
+
+  // --- CÁC HÀM XỬ LÝ SỔ ĐỊA CHỈ GIAO HÀNG ---
+  const openAddressModal = (addr?: any) => {
+    if (addr) {
+      setAddressModalForm({
+        id: addr.id,
+        recipientName: addr.recipientName || "",
+        recipientPhone: addr.recipientPhone || "",
+        address: addr.address || "",
+        label: addr.label || "Nhà riêng",
+        isDefault: !!addr.isDefault
+      });
+    } else {
+      const userAddresses = Array.isArray(currentUser?.addresses) ? currentUser.addresses : [];
+      setAddressModalForm({
+        id: "",
+        recipientName: currentUser?.name || "",
+        recipientPhone: currentUser?.phone || "",
+        address: "",
+        label: "Nhà riêng",
+        isDefault: userAddresses.length === 0
+      });
+    }
+    setIsAddressModalOpen(true);
+  };
+
+  const handleSaveAddressFromModal = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentUser) return;
+    if (!addressModalForm.recipientName.trim()) return showToast("Vui lòng nhập họ tên người nhận!", "error");
+    if (!addressModalForm.recipientPhone.trim()) return showToast("Vui lòng nhập SĐT người nhận!", "error");
+    if (!addressModalForm.address.trim()) return showToast("Vui lòng nhập địa chỉ giao hàng chi tiết!", "error");
+
+    setIsAddressSubmitting(true);
+    try {
+      const currentAddresses = Array.isArray(currentUser.addresses) ? [...currentUser.addresses] : [];
+      let updatedAddresses: any[];
+
+      const isFirstAddr = currentAddresses.length === 0;
+      const willBeDefault = addressModalForm.isDefault || isFirstAddr;
+
+      if (addressModalForm.id) {
+        // Cập nhật địa chỉ hiện có
+        updatedAddresses = currentAddresses.map((a: any) => {
+          if (a.id === addressModalForm.id) {
+            return {
+              ...a,
+              recipientName: addressModalForm.recipientName.trim(),
+              recipientPhone: addressModalForm.recipientPhone.trim(),
+              address: addressModalForm.address.trim(),
+              label: addressModalForm.label || "Nhà riêng",
+              isDefault: willBeDefault
+            };
+          }
+          return willBeDefault ? { ...a, isDefault: false } : a;
+        });
+      } else {
+        // Thêm địa chỉ mới
+        const newAddr = {
+          id: `addr_${Date.now()}`,
+          recipientName: addressModalForm.recipientName.trim(),
+          recipientPhone: addressModalForm.recipientPhone.trim(),
+          address: addressModalForm.address.trim(),
+          label: addressModalForm.label || "Nhà riêng",
+          isDefault: willBeDefault
+        };
+        if (willBeDefault) {
+          updatedAddresses = currentAddresses.map((a: any) => ({ ...a, isDefault: false }));
+          updatedAddresses.push(newAddr);
+        } else {
+          updatedAddresses = [...currentAddresses, newAddr];
+        }
+      }
+
+      const res = await fetch('/api/auth/me', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: currentUser.id, addresses: updatedAddresses })
+      });
+      const data = await res.json();
+      if (res.ok && data.data) {
+        setCurrentUser(data.data);
+        localStorage.setItem("lamdien_user", JSON.stringify(data.data));
+        setIsAddressModalOpen(false);
+        showToast(addressModalForm.id ? "Cập nhật địa chỉ thành công!" : "Đã thêm địa chỉ mới!", "success");
+      } else {
+        showToast(data.error || "Lỗi khi lưu địa chỉ", "error");
+      }
+    } catch {
+      showToast("Lỗi kết nối máy chủ", "error");
+    } finally {
+      setIsAddressSubmitting(false);
+    }
+  };
+
+  const handleSetDefaultAddress = async (addressId: string) => {
+    if (!currentUser) return;
+    const currentAddresses = Array.isArray(currentUser.addresses) ? currentUser.addresses : [];
+    const updated = currentAddresses.map((a: any) => ({
+      ...a,
+      isDefault: a.id === addressId
+    }));
+
+    try {
+      const res = await fetch('/api/auth/me', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: currentUser.id, addresses: updated })
+      });
+      const data = await res.json();
+      if (res.ok && data.data) {
+        setCurrentUser(data.data);
+        localStorage.setItem("lamdien_user", JSON.stringify(data.data));
+        showToast("Đã chọn làm địa chỉ giao hàng mặc định!", "success");
+      }
+    } catch {
+      showToast("Lỗi cập nhật địa chỉ", "error");
+    }
+  };
+
+  const handleDeleteAddress = async (addressId: string) => {
+    if (!currentUser) return;
+    const currentAddresses = Array.isArray(currentUser.addresses) ? currentUser.addresses : [];
+    let updated = currentAddresses.filter((a: any) => a.id !== addressId);
+    if (updated.length > 0 && !updated.some((a: any) => a.isDefault)) {
+      updated[0].isDefault = true;
+    }
+
+    try {
+      const res = await fetch('/api/auth/me', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: currentUser.id, addresses: updated })
+      });
+      const data = await res.json();
+      if (res.ok && data.data) {
+        setCurrentUser(data.data);
+        localStorage.setItem("lamdien_user", JSON.stringify(data.data));
+        showToast("Đã xóa địa chỉ thành công!", "success");
+      }
+    } catch {
+      showToast("Lỗi khi xóa địa chỉ", "error");
+    }
+  };
+
+  // Helper khởi tạo thông tin giao hàng khi mở checkout
+  const initCheckoutAddress = (user: any) => {
+    const userAddresses = Array.isArray(user?.addresses) ? user.addresses : [];
+    const defaultAddr = userAddresses.find((a: any) => a.isDefault) || userAddresses[0];
+
+    if (defaultAddr) {
+      setSelectedAddressId(defaultAddr.id);
+      setIsAddingNewAddress(false);
+      setCheckoutForm({
+        customerName: defaultAddr.recipientName || user?.name || "",
+        customerEmail: user?.email || "",
+        customerPhone: defaultAddr.recipientPhone || user?.phone || "",
+        address: defaultAddr.address || "",
+        note: "",
+        label: defaultAddr.label || "Nhà riêng",
+        paymentMethod: "COD"
+      });
+    } else {
+      setSelectedAddressId("custom");
+      setIsAddingNewAddress(true);
+      setCheckoutForm({
+        customerName: user?.name || "",
+        customerEmail: user?.email || "",
+        customerPhone: user?.phone || "",
+        address: user?.address || "",
+        note: "",
+        label: "Nhà riêng",
+        paymentMethod: "COD"
+      });
+    }
+  };
+
+  const handleSelectSavedAddress = (addr: any) => {
+    setSelectedAddressId(addr.id);
+    setIsAddingNewAddress(false);
+    setCheckoutForm(prev => ({
+      ...prev,
+      customerName: addr.recipientName || currentUser?.name || "",
+      customerPhone: addr.recipientPhone || currentUser?.phone || "",
+      address: addr.address || "",
+      label: addr.label || "Nhà riêng"
+    }));
+  };
+
+  const handleSelectNewAddressMode = () => {
+    setSelectedAddressId("custom");
+    setIsAddingNewAddress(true);
+    setCheckoutForm(prev => ({
+      ...prev,
+      customerName: currentUser?.name || "",
+      customerPhone: "",
+      address: "",
+      label: "Nhà riêng"
+    }));
   };
 
   const saveCart = (newCart: any[]) => {
@@ -213,22 +665,56 @@ export default function ShopLamDienPage() {
     }
   };
 
-  const addToCart = (product: any, size: string) => {
-    if (!size && product.sizes?.length > 0) return showToast("Vui lòng chọn Size!", "error");
-    const actualPrice = product.discountPrice || product.price;
-    const cartItemId = `${product.id}_${size || 'freesize'}`;
+  const addToCart = (product: any, size: string, colorName?: string, qty: number = 1) => {
+    // Xác định biến thể màu
+    const variants = (product.colorVariants && Array.isArray(product.colorVariants)) ? product.colorVariants as any[] : [];
+    const chosenColor = colorName || (variants.length > 0 ? variants[0].colorName : null);
+    const variant = chosenColor ? variants.find((v: any) => v.colorName === chosenColor) : null;
+
+    // Kiểm tra size theo màu
+    const availableSizes = variant?.sizes
+      ? (Array.isArray(variant.sizes) ? variant.sizes : variant.sizes.split(',').map((s: string) => s.trim()).filter(Boolean))
+      : (product.sizes || []);
+
+    if (availableSizes.length > 0 && !size) return showToast("Vui lòng chọn Size!", "error");
+    if (availableSizes.length > 0 && size && !availableSizes.includes(size)) {
+      return showToast(`Size ${size} không có sẵn cho màu "${chosenColor}"!`, "error");
+    }
+
+    // Lấy tồn kho cụ thể của size đó
+    const sizeSpecificStock = (variant?.sizeStocks && size && variant.sizeStocks[size] !== undefined)
+      ? Number(variant.sizeStocks[size])
+      : (variant ? variant.stock : product.stock);
+
+    if (sizeSpecificStock <= 0) {
+      return showToast(size ? `Size ${size} màu "${chosenColor}" đã hết hàng!` : "Sản phẩm đã hết hàng!", "error");
+    }
+
+    const actualPrice = variant ? (variant.discountPrice || variant.price) : (product.discountPrice || product.price);
+    const variantImage = (variant?.image) || (product.images && product.images[0]) || product.image;
+
+    const cartItemId = `${product.id}_${size || 'freesize'}_${chosenColor || 'default'}`;
     const existingItem = cart.find(item => item.cartItemId === cartItemId);
-    const totalProductQty = cart.filter(item => item.productId === product.id).reduce((sum, item) => sum + item.quantity, 0);
-    if (totalProductQty + 1 > product.stock) return showToast("Đã hết hàng", "error");
+    const currentItemCartQty = existingItem ? existingItem.quantity : 0;
+
+    if (currentItemCartQty + qty > sizeSpecificStock) {
+      return showToast(
+        size
+          ? `Size ${size} màu "${chosenColor}" chỉ còn ${sizeSpecificStock} sản phẩm (bạn đã có ${currentItemCartQty} trong giỏ)!`
+          : `Sản phẩm chỉ còn ${sizeSpecificStock} chiếc!`,
+        "error"
+      );
+    }
 
     let newCart = [...cart];
     if (existingItem) newCart = newCart.map(item => item.cartItemId === cartItemId ? { ...item, quantity: item.quantity + 1 } : item);
     else newCart.push({ cartItemId, productId: product.id, name: product.name, price: actualPrice, size: size || null, image: product.image, quantity: 1 });
 
     saveCart(newCart);
-    showToast("Đã thêm vào giỏ hàng!", "success");
+    showToast(qty > 1 ? `Đã thêm ${qty} sản phẩm vào giỏ hàng!` : "Đã thêm vào giỏ hàng!", "success");
     setIsCartOpen(true);
     setSelectedProduct(null);
+    setPopupQuantity(1);
   };
 
   const removeFromCart = (cartItemId: string) => { saveCart(cart.filter(item => item.cartItemId !== cartItemId)); };
@@ -238,8 +724,20 @@ export default function ShopLamDienPage() {
     if (!itemToUpdate) return;
     const productData = products.find(p => p.id === itemToUpdate.productId);
     if (delta > 0 && productData) {
-      const totalProductQty = cart.filter(item => item.productId === itemToUpdate.productId).reduce((sum, item) => sum + item.quantity, 0);
-      if (totalProductQty + delta > productData.stock) return showToast("Đã hết hàng", "error");
+      const variants = (productData.colorVariants && Array.isArray(productData.colorVariants)) ? productData.colorVariants as any[] : [];
+      const variant = itemToUpdate.color ? variants.find((v: any) => v.colorName === itemToUpdate.color) : null;
+      const maxStock = (variant?.sizeStocks && itemToUpdate.size && variant.sizeStocks[itemToUpdate.size] !== undefined)
+        ? Number(variant.sizeStocks[itemToUpdate.size])
+        : (variant ? variant.stock : productData.stock);
+
+      if (itemToUpdate.quantity + delta > maxStock) {
+        return showToast(
+          itemToUpdate.size
+            ? `Size ${itemToUpdate.size} màu "${itemToUpdate.color || ''}" chỉ còn ${maxStock} sản phẩm!`
+            : `Chỉ còn ${maxStock} sản phẩm!`,
+          "error"
+        );
+      }
     }
 
     const newCart = cart.map(item => {
@@ -262,31 +760,63 @@ export default function ShopLamDienPage() {
       setIsLoginMode(true);
       return;
     }
-    setCheckoutForm({ customerName: currentUser.name || "", customerEmail: currentUser.email || "", customerPhone: currentUser.phone || "", address: currentUser.address || "", paymentMethod: "COD" });
+    initCheckoutAddress(currentUser);
     setIsQrPaid(false);
     setIsCartOpen(false);
     setIsCheckoutOpen(true);
   };
 
-  const buyNow = (product: any, size: string) => {
-    if (!size && product.sizes?.length > 0) return showToast("Vui lòng chọn Size!", "error");
+  const buyNow = (product: any, size: string, colorName?: string, qty: number = 1) => {
     if (!currentUser) {
       showToast("Vui lòng đăng nhập để mua hàng!", "error");
       setIsAuthModalOpen(true);
       setIsLoginMode(true);
       return;
     }
-    const actualPrice = product.discountPrice || product.price;
-    const cartItemId = `${product.id}_${size || 'freesize'}`;
-    const totalProductQty = cart.filter(item => item.productId === product.id).reduce((sum, item) => sum + item.quantity, 0);
-    if (totalProductQty + 1 > product.stock) return showToast("Đã hết hàng", "error");
+    const variants = (product.colorVariants && Array.isArray(product.colorVariants)) ? product.colorVariants as any[] : [];
+    const chosenColor = colorName || (variants.length > 0 ? variants[0].colorName : null);
+    const variant = chosenColor ? variants.find((v: any) => v.colorName === chosenColor) : null;
+
+    // Kiểm tra size theo màu
+    const availableSizes = variant?.sizes
+      ? (Array.isArray(variant.sizes) ? variant.sizes : variant.sizes.split(',').map((s: string) => s.trim()).filter(Boolean))
+      : (product.sizes || []);
+
+    if (availableSizes.length > 0 && !size) return showToast("Vui lòng chọn Size!", "error");
+    if (availableSizes.length > 0 && size && !availableSizes.includes(size)) {
+      return showToast(`Size ${size} không có sẵn cho màu "${chosenColor}"!`, "error");
+    }
+
+    // Lấy tồn kho cụ thể của size đó
+    const sizeSpecificStock = (variant?.sizeStocks && size && variant.sizeStocks[size] !== undefined)
+      ? Number(variant.sizeStocks[size])
+      : (variant ? variant.stock : product.stock);
+
+    if (sizeSpecificStock <= 0) {
+      return showToast(size ? `Size ${size} màu "${chosenColor}" đã hết hàng!` : "Sản phẩm đã hết hàng!", "error");
+    }
+
+    const actualPrice = variant ? (variant.discountPrice || variant.price) : (product.discountPrice || product.price);
+    const variantImage = (variant?.image) || (product.images && product.images[0]) || product.image;
+
+    const cartItemId = `${product.id}_${size || 'freesize'}_${chosenColor || 'default'}`;
     const existingItem = cart.find(item => item.cartItemId === cartItemId);
+    const currentItemCartQty = existingItem ? existingItem.quantity : 0;
+    if (currentItemCartQty + qty > sizeSpecificStock) {
+      return showToast(
+        size
+          ? `Size ${size} màu "${chosenColor}" chỉ còn ${sizeSpecificStock} sản phẩm!`
+          : `Sản phẩm chỉ còn ${sizeSpecificStock} chiếc!`,
+        "error"
+      );
+    }
     let newCart = [...cart];
-    if (existingItem) newCart = newCart.map(item => item.cartItemId === cartItemId ? { ...item, quantity: item.quantity + 1 } : item);
-    else newCart.push({ cartItemId, productId: product.id, name: product.name, price: actualPrice, size: size || null, image: product.image, quantity: 1 });
+    if (existingItem) newCart = newCart.map(item => item.cartItemId === cartItemId ? { ...item, quantity: item.quantity + qty } : item);
+    else newCart.push({ cartItemId, productId: product.id, name: product.name, price: actualPrice, size: size || null, color: chosenColor, image: variantImage, quantity: qty });
     saveCart(newCart);
     setSelectedProduct(null);
-    setCheckoutForm({ customerName: currentUser.name || "", customerEmail: currentUser.email || "", customerPhone: currentUser.phone || "", address: currentUser.address || "", paymentMethod: "COD" });
+    setPopupQuantity(1);
+    initCheckoutAddress(currentUser);
     setIsQrPaid(false);
     setIsCartOpen(false);
     setIsCheckoutOpen(true);
@@ -301,13 +831,55 @@ export default function ShopLamDienPage() {
     e.preventDefault();
     const phoneRegex = /(84|0[3|5|7|8|9])+([0-9]{8})\b/;
     if (!phoneRegex.test(checkoutForm.customerPhone)) return showToast("Số điện thoại không hợp lệ.", "error");
+    if (!checkoutForm.address.trim()) return showToast("Vui lòng nhập địa chỉ giao hàng.", "error");
     const finalPaymentStatus = (checkoutForm.paymentMethod === 'QR' && isQrPaid) ? 'PAID' : 'PENDING';
 
     setIsCheckoutSubmitting(true); // BẬT LOADING
     try {
-      const orderData = { ...checkoutForm, totalAmount: cartTotal, paymentStatus: finalPaymentStatus, items: cart };
+      const shippingDetails = {
+        recipientName: checkoutForm.customerName,
+        recipientPhone: checkoutForm.customerPhone,
+        customerEmail: checkoutForm.customerEmail,
+        address: checkoutForm.address,
+        label: checkoutForm.label || "Nhà riêng",
+        note: checkoutForm.note || ""
+      };
+
+      const orderData = {
+        ...checkoutForm,
+        note: checkoutForm.note || null,
+        shippingDetails,
+        userId: currentUser?.id || null,
+        totalAmount: cartTotal,
+        paymentStatus: finalPaymentStatus,
+        items: cart
+      };
       const res = await fetch('/api/orders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(orderData) });
       if (res.ok) {
+        // Tự động lưu địa chỉ mới vào sổ địa chỉ nếu khách chọn lưu
+        if (isAddingNewAddress && saveAddressToBook && currentUser) {
+          const currentAddresses = Array.isArray(currentUser.addresses) ? currentUser.addresses : [];
+          const newAddr = {
+            id: `addr_${Date.now()}`,
+            recipientName: checkoutForm.customerName,
+            recipientPhone: checkoutForm.customerPhone,
+            address: checkoutForm.address,
+            label: checkoutForm.label || "Nhà riêng",
+            isDefault: currentAddresses.length === 0
+          };
+          const updatedAddresses = [...currentAddresses, newAddr];
+          fetch('/api/auth/me', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: currentUser.id, addresses: updatedAddresses })
+          }).then(r => r.json()).then(d => {
+            if (d.data) {
+              setCurrentUser(d.data);
+              localStorage.setItem("lamdien_user", JSON.stringify(d.data));
+            }
+          }).catch(console.error);
+        }
+
         showToast("Đặt hàng thành công! Chúng tôi sẽ chuẩn bị đơn sớm nhất.", "success");
         saveCart([]);
         setIsCheckoutOpen(false);
@@ -440,7 +1012,9 @@ export default function ShopLamDienPage() {
           matchesCategory = true;
         }
       } else if (activeHeaderTab === "GIẢM GIÁ") {
-        matchesCategory = Boolean(prod.discountPrice && prod.discountPrice > 0);
+        // Check cả variants lẫn product-level discount
+        const hasVariantDiscount = prod.colorVariants && Array.isArray(prod.colorVariants) && (prod.colorVariants as any[]).some((v: any) => v.discountPrice && v.discountPrice > 0);
+        matchesCategory = Boolean(hasVariantDiscount || (prod.discountPrice && prod.discountPrice > 0));
       } else {
         if (activeSubCategory) {
           matchesCategory = prod.categoryId === activeSubCategory || prod.category?.id === activeSubCategory;
@@ -472,16 +1046,25 @@ export default function ShopLamDienPage() {
 
     // 3. SIZE & PRICE FILTERING
     const matchesSize = selectedSize ? prod.sizes && prod.sizes.includes(selectedSize) : true;
-    const actualPrice = prod.discountPrice || prod.price;
+    // Lấy giá thực tế từ biến thể đầu tiên nếu có
+    const variants = (prod.colorVariants && Array.isArray(prod.colorVariants)) ? prod.colorVariants as any[] : [];
+    const firstVariant = variants[0];
+    const actualPrice = firstVariant ? (firstVariant.discountPrice || firstVariant.price) : (prod.discountPrice || prod.price);
     const matchesPrice = actualPrice <= priceRange;
 
     // 4. QUICK FILTER
     let matchesQuickFilter = true;
     if (quickFilter === "SALE") {
-      matchesQuickFilter = Boolean(prod.discountPrice && prod.discountPrice > 0);
+      const hasVariantDiscount = variants.some((v: any) => v.discountPrice && v.discountPrice > 0);
+      matchesQuickFilter = Boolean(hasVariantDiscount || (prod.discountPrice && prod.discountPrice > 0));
     }
 
-    return matchesCategory && matchesSize && matchesPrice && matchesQuickFilter;
+    // 5. COLOR FILTERING
+    const matchesColor = selectedFilterColor
+      ? variants.some((v: any) => v.colorName?.trim().toLowerCase() === selectedFilterColor.trim().toLowerCase())
+      : true;
+
+    return matchesCategory && matchesSize && matchesPrice && matchesQuickFilter && matchesColor;
   }).sort((a, b) => {
     if (isSearchActive && ((b as any)._searchScore || 0) !== ((a as any)._searchScore || 0)) {
       return ((b as any)._searchScore || 0) - ((a as any)._searchScore || 0);
@@ -570,12 +1153,12 @@ export default function ShopLamDienPage() {
                   key={item}
                   onClick={() => { setActiveHeaderTab(item); setActiveSubCategory(""); setQuickFilter(item === 'GIẢM GIÁ' ? 'SALE' : 'ALL'); handleClearSearch(); setIsSearchOpen(false); }}
                   className={`px-4 py-2 text-xs font-black uppercase tracking-wider rounded-xl transition-all duration-200 flex items-center gap-1.5 ${isActive
-                      ? isSale
-                        ? 'bg-gradient-to-r from-red-500 to-rose-600 text-white shadow-md shadow-red-500/20'
-                        : 'bg-teal-700 text-white shadow-md shadow-teal-700/20'
-                      : isSale
-                        ? 'text-red-500 hover:bg-red-50'
-                        : 'text-slate-600 hover:bg-white hover:text-teal-700'
+                    ? isSale
+                      ? 'bg-gradient-to-r from-red-500 to-rose-600 text-white shadow-md shadow-red-500/20'
+                      : 'bg-teal-700 text-white shadow-md shadow-teal-700/20'
+                    : isSale
+                      ? 'text-red-500 hover:bg-red-50'
+                      : 'text-slate-600 hover:bg-white hover:text-teal-700'
                     }`}
                 >
                   {isSale && <Flame className={`w-3.5 h-3.5 ${isActive ? 'text-amber-300' : 'text-red-500 animate-pulse'}`} />}
@@ -639,8 +1222,8 @@ export default function ShopLamDienPage() {
                 <button
                   onClick={() => setIsSearchOpen(true)}
                   className={`p-2 sm:p-2.5 rounded-xl transition-all ${isSearchActive
-                      ? 'bg-teal-50 text-teal-700 border border-teal-200 shadow-xs'
-                      : 'hover:bg-slate-100 text-slate-600 hover:text-teal-700'
+                    ? 'bg-teal-50 text-teal-700 border border-teal-200 shadow-xs'
+                    : 'hover:bg-slate-100 text-slate-600 hover:text-teal-700'
                     }`}
                   title="Tìm kiếm tất cả sản phẩm"
                 >
@@ -698,12 +1281,12 @@ export default function ShopLamDienPage() {
                     setIsSearchOpen(false);
                   }}
                   className={`flex-shrink-0 px-3.5 py-1.5 text-xs font-black uppercase tracking-wider rounded-xl transition-all duration-200 flex items-center gap-1 ${isActive
-                      ? isSale
-                        ? 'bg-gradient-to-r from-red-500 to-rose-600 text-white shadow-sm shadow-red-500/30'
-                        : 'bg-teal-700 text-white shadow-sm shadow-teal-700/30'
-                      : isSale
-                        ? 'text-red-600 bg-red-50 hover:bg-red-100'
-                        : 'text-slate-600 bg-slate-50 hover:bg-slate-100 border border-slate-100'
+                    ? isSale
+                      ? 'bg-gradient-to-r from-red-500 to-rose-600 text-white shadow-sm shadow-red-500/30'
+                      : 'bg-teal-700 text-white shadow-sm shadow-teal-700/30'
+                    : isSale
+                      ? 'text-red-600 bg-red-50 hover:bg-red-100'
+                      : 'text-slate-600 bg-slate-50 hover:bg-slate-100 border border-slate-100'
                     }`}
                 >
                   {isSale && <Flame className={`w-3.5 h-3.5 ${isActive ? 'text-amber-300' : 'text-red-500 animate-pulse'}`} />}
@@ -719,8 +1302,8 @@ export default function ShopLamDienPage() {
               <button
                 onClick={() => setActiveSubCategory("")}
                 className={`flex-shrink-0 px-3 py-1 rounded-lg text-[11px] font-bold transition-all ${activeSubCategory === ""
-                    ? 'bg-teal-700 text-white shadow-xs'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  ? 'bg-teal-700 text-white shadow-xs'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                   }`}
               >
                 Tất cả {activeHeaderTab}
@@ -732,8 +1315,8 @@ export default function ShopLamDienPage() {
                     key={subCat.id}
                     onClick={() => setActiveSubCategory(subCat.id)}
                     className={`flex-shrink-0 px-3 py-1 rounded-lg text-[11px] font-bold transition-all ${isSelected
-                        ? 'bg-teal-700 text-white shadow-xs'
-                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      ? 'bg-teal-700 text-white shadow-xs'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                       }`}
                   >
                     {subCat.name}
@@ -803,8 +1386,8 @@ export default function ShopLamDienPage() {
                     }
                   }}
                   className={`px-3.5 sm:px-4 py-1.5 rounded-full text-xs font-bold transition-all duration-200 border ${isActive
-                      ? 'bg-teal-500 text-white border-teal-400 shadow-md shadow-teal-500/30 scale-105'
-                      : 'bg-white/10 hover:bg-white/20 text-white/90 border-white/15 backdrop-blur-sm'
+                    ? 'bg-teal-500 text-white border-teal-400 shadow-md shadow-teal-500/30 scale-105'
+                    : 'bg-white/10 hover:bg-white/20 text-white/90 border-white/15 backdrop-blur-sm'
                     }`}
                 >
                   {pill.label}
@@ -852,12 +1435,13 @@ export default function ShopLamDienPage() {
               <span className="font-black text-slate-900 uppercase text-xs tracking-wider flex items-center gap-2">
                 <Tag className="w-3.5 h-3.5 text-teal-700" /> Bộ Lọc Tìm Kiếm
               </span>
-              {(activeSubCategory || selectedSize || priceRange < 5000000 || isSearchActive || activeHeaderTab === "GIẢM GIÁ" || activeHeaderTab !== "TẤT CẢ" || quickFilter !== "ALL") && (
+              {(activeSubCategory || selectedSize || selectedFilterColor || priceRange < 5000000 || isSearchActive || activeHeaderTab === "GIẢM GIÁ" || activeHeaderTab !== "TẤT CẢ" || quickFilter !== "ALL") && (
                 <button
                   onClick={() => {
                     setActiveHeaderTab("TẤT CẢ");
                     setActiveSubCategory("");
                     setSelectedSize("");
+                    setSelectedFilterColor("");
                     setPriceRange(5000000);
                     handleClearSearch();
                     setQuickFilter("ALL");
@@ -879,8 +1463,8 @@ export default function ShopLamDienPage() {
                     <button
                       onClick={() => setActiveSubCategory("")}
                       className={`text-left px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-between ${activeSubCategory === ""
-                          ? 'bg-teal-700 text-white shadow-md shadow-teal-700/20'
-                          : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                        ? 'bg-teal-700 text-white shadow-md shadow-teal-700/20'
+                        : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                         }`}
                     >
                       <span>Tất cả {activeHeaderTab}</span>
@@ -893,8 +1477,8 @@ export default function ShopLamDienPage() {
                           key={subCat.id}
                           onClick={() => setActiveSubCategory(subCat.id)}
                           className={`text-left px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-between ${isSelected
-                              ? 'bg-teal-700 text-white shadow-md shadow-teal-700/20'
-                              : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                            ? 'bg-teal-700 text-white shadow-md shadow-teal-700/20'
+                            : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                             }`}
                         >
                           <span>{subCat.name}</span>
@@ -925,8 +1509,8 @@ export default function ShopLamDienPage() {
                       key={size}
                       onClick={() => setSelectedSize(selectedSize === size ? "" : size)}
                       className={`h-9 flex items-center justify-center rounded-xl text-xs font-black transition-all ${isSelected
-                          ? 'bg-teal-700 text-white shadow-md shadow-teal-700/20 scale-105'
-                          : 'bg-slate-50 text-slate-700 hover:bg-slate-100 hover:text-slate-900 border border-slate-100'
+                        ? 'bg-teal-700 text-white shadow-md shadow-teal-700/20 scale-105'
+                        : 'bg-slate-50 text-slate-700 hover:bg-slate-100 hover:text-slate-900 border border-slate-100'
                         }`}
                     >
                       {size}
@@ -935,6 +1519,48 @@ export default function ShopLamDienPage() {
                 })}
               </div>
             </div>
+
+            {/* Color Filter */}
+            {availableColors.length > 0 && (
+              <div className="pt-2">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-extrabold text-slate-800 text-xs uppercase tracking-wider flex items-center gap-1.5">
+                    Màu sắc
+                  </h3>
+                  {selectedFilterColor && (
+                    <button
+                      onClick={() => setSelectedFilterColor("")}
+                      className="text-[10px] font-bold text-teal-700 hover:underline"
+                    >
+                      Bỏ chọn
+                    </button>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {availableColors.map((col) => {
+                    const isSelected = selectedFilterColor.toLowerCase() === col.name.toLowerCase();
+                    return (
+                      <button
+                        key={col.name}
+                        onClick={() => setSelectedFilterColor(isSelected ? "" : col.name)}
+                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all ${isSelected
+                            ? 'bg-teal-700 text-white shadow-md shadow-teal-700/20 ring-2 ring-teal-700/30 scale-105'
+                            : 'bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200/70'
+                          }`}
+                        title={`${col.name} (${col.count} SP)`}
+                      >
+                        <span
+                          className="w-3.5 h-3.5 rounded-full border border-black/10 flex-shrink-0"
+                          style={{ backgroundColor: col.code }}
+                        />
+                        <span>{col.name}</span>
+                        <span className={`text-[10px] ${isSelected ? 'text-teal-200' : 'text-slate-400'}`}>({col.count})</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Price Filter */}
             <div className="pt-2">
@@ -973,9 +1599,9 @@ export default function ShopLamDienPage() {
             >
               <SlidersHorizontal className="w-4 h-4 text-teal-700" />
               <span>Bộ lọc</span>
-              {(selectedSize || priceRange < 5000000 || activeSubCategory) && (
+              {(selectedSize || selectedFilterColor || priceRange < 5000000 || activeSubCategory) && (
                 <span className="w-4 h-4 bg-teal-700 text-white rounded-full text-[9px] flex items-center justify-center font-black">
-                  {Number(Boolean(selectedSize)) + Number(priceRange < 5000000) + Number(Boolean(activeSubCategory))}
+                  {Number(Boolean(selectedSize)) + Number(Boolean(selectedFilterColor)) + Number(priceRange < 5000000) + Number(Boolean(activeSubCategory))}
                 </span>
               )}
             </button>
@@ -992,8 +1618,8 @@ export default function ShopLamDienPage() {
                     key={sortPill.id}
                     onClick={() => setQuickFilter(sortPill.id)}
                     className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${isSelected
-                        ? 'bg-teal-700 text-white shadow-xs'
-                        : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-100'
+                      ? 'bg-teal-700 text-white shadow-xs'
+                      : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-100'
                       }`}
                   >
                     {sortPill.label}
@@ -1238,8 +1864,8 @@ export default function ShopLamDienPage() {
                       key={idx}
                       onClick={() => setCurrentPage(idx + 1)}
                       className={`w-9 h-9 flex items-center justify-center rounded-xl font-bold text-xs transition-all ${currentPage === idx + 1
-                          ? 'bg-teal-700 text-white shadow-md shadow-teal-700/20'
-                          : 'bg-white border border-slate-200/80 shadow-sm hover:bg-slate-50 text-slate-600'
+                        ? 'bg-teal-700 text-white shadow-md shadow-teal-700/20'
+                        : 'bg-white border border-slate-200/80 shadow-sm hover:bg-slate-50 text-slate-600'
                         }`}
                     >
                       {idx + 1}
@@ -1330,12 +1956,12 @@ export default function ShopLamDienPage() {
                   <div key={tab} className="rounded-xl overflow-hidden">
                     <div
                       className={`flex items-center justify-between px-3.5 py-3 rounded-xl transition-all cursor-pointer ${isActive
-                          ? isSale
-                            ? 'bg-gradient-to-r from-red-500 to-rose-600 text-white font-black shadow-sm'
-                            : 'bg-teal-700 text-white font-black shadow-sm'
-                          : isSale
-                            ? 'text-red-600 bg-red-50 hover:bg-red-100 font-bold'
-                            : 'text-slate-700 hover:bg-slate-50 font-bold'
+                        ? isSale
+                          ? 'bg-gradient-to-r from-red-500 to-rose-600 text-white font-black shadow-sm'
+                          : 'bg-teal-700 text-white font-black shadow-sm'
+                        : isSale
+                          ? 'text-red-600 bg-red-50 hover:bg-red-100 font-bold'
+                          : 'text-slate-700 hover:bg-slate-50 font-bold'
                         }`}
                       onClick={() => {
                         setActiveHeaderTab(tab);
@@ -1378,8 +2004,8 @@ export default function ShopLamDienPage() {
                             setIsMobileMenuOpen(false);
                           }}
                           className={`w-full text-left px-3 py-2 text-xs rounded-lg transition-colors flex items-center justify-between ${activeSubCategory === "" && activeHeaderTab === tab
-                              ? 'font-black text-teal-700 bg-teal-50'
-                              : 'font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                            ? 'font-black text-teal-700 bg-teal-50'
+                            : 'font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100'
                             }`}
                         >
                           <span>Tất cả {tab}</span>
@@ -1395,8 +2021,8 @@ export default function ShopLamDienPage() {
                               setIsMobileMenuOpen(false);
                             }}
                             className={`w-full text-left px-3 py-2 text-xs rounded-lg transition-colors flex items-center justify-between ${activeSubCategory === sub.id
-                                ? 'font-black text-teal-700 bg-teal-50'
-                                : 'font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                              ? 'font-black text-teal-700 bg-teal-50'
+                              : 'font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100'
                               }`}
                           >
                             <span>{sub.name}</span>
@@ -1481,8 +2107,8 @@ export default function ShopLamDienPage() {
                     <button
                       onClick={() => setActiveSubCategory("")}
                       className={`px-3 py-2.5 rounded-xl text-xs font-bold text-left transition-all border ${activeSubCategory === ""
-                          ? 'bg-teal-700 text-white border-teal-700 shadow-xs'
-                          : 'bg-slate-50 text-slate-700 border-slate-100 hover:bg-slate-100'
+                        ? 'bg-teal-700 text-white border-teal-700 shadow-xs'
+                        : 'bg-slate-50 text-slate-700 border-slate-100 hover:bg-slate-100'
                         }`}
                     >
                       Tất cả {activeHeaderTab}
@@ -1494,8 +2120,8 @@ export default function ShopLamDienPage() {
                           key={subCat.id}
                           onClick={() => setActiveSubCategory(subCat.id)}
                           className={`px-3 py-2.5 rounded-xl text-xs font-bold text-left transition-all border truncate ${isSelected
-                              ? 'bg-teal-700 text-white border-teal-700 shadow-xs'
-                              : 'bg-slate-50 text-slate-700 border-slate-100 hover:bg-slate-100'
+                            ? 'bg-teal-700 text-white border-teal-700 shadow-xs'
+                            : 'bg-slate-50 text-slate-700 border-slate-100 hover:bg-slate-100'
                             }`}
                         >
                           {subCat.name}
@@ -1520,8 +2146,8 @@ export default function ShopLamDienPage() {
                         key={size}
                         onClick={() => setSelectedSize(selectedSize === size ? "" : size)}
                         className={`h-10 flex items-center justify-center rounded-xl text-xs font-black transition-all ${isSelected
-                            ? 'bg-teal-700 text-white shadow-md shadow-teal-700/20 scale-105'
-                            : 'bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-100'
+                          ? 'bg-teal-700 text-white shadow-md shadow-teal-700/20 scale-105'
+                          : 'bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-100'
                           }`}
                       >
                         {size}
@@ -1530,6 +2156,47 @@ export default function ShopLamDienPage() {
                   })}
                 </div>
               </div>
+
+              {/* Color Filter (Mobile) */}
+              {availableColors.length > 0 && (
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="font-extrabold text-slate-800 text-xs uppercase tracking-wider flex items-center gap-1.5">
+                      Màu sắc
+                    </h4>
+                    {selectedFilterColor && (
+                      <button
+                        onClick={() => setSelectedFilterColor("")}
+                        className="text-[10px] font-bold text-teal-700 hover:underline"
+                      >
+                        Bỏ chọn
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {availableColors.map((col) => {
+                      const isSelected = selectedFilterColor.toLowerCase() === col.name.toLowerCase();
+                      return (
+                        <button
+                          key={col.name}
+                          onClick={() => setSelectedFilterColor(isSelected ? "" : col.name)}
+                          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ${isSelected
+                              ? 'bg-teal-700 text-white shadow-md shadow-teal-700/20 ring-2 ring-teal-700/30 scale-105'
+                              : 'bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200/70'
+                            }`}
+                        >
+                          <span
+                            className="w-3.5 h-3.5 rounded-full border border-black/10 flex-shrink-0"
+                            style={{ backgroundColor: col.code }}
+                          />
+                          <span>{col.name}</span>
+                          <span className={`text-[10px] ${isSelected ? 'text-teal-200' : 'text-slate-400'}`}>({col.count})</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               {/* Price Range */}
               <div>
@@ -1558,6 +2225,7 @@ export default function ShopLamDienPage() {
                 onClick={() => {
                   setActiveSubCategory("");
                   setSelectedSize("");
+                  setSelectedFilterColor("");
                   setPriceRange(5000000);
                 }}
                 className="px-4 py-3 bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs rounded-xl border border-slate-200"
@@ -1653,88 +2321,156 @@ export default function ShopLamDienPage() {
       )}
 
       {/* ==================== MODAL: CHI TIẾT SẢN PHẨM ==================== */}
-      {selectedProduct && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-y-auto flex flex-col md:flex-row shadow-2xl relative">
-            <button onClick={() => { setSelectedProduct(null); setPopupSize(""); }} className="absolute top-4 right-4 p-2 bg-slate-100 hover:bg-slate-200 rounded-lg z-10 transition-colors"><X className="w-5 h-5 text-slate-600" /></button>
+      {selectedProduct && (() => {
+        const popupVariants = (selectedProduct.colorVariants && Array.isArray(selectedProduct.colorVariants)) ? selectedProduct.colorVariants as any[] : [];
+        const activeVariant = popupVariants.find((v: any) => v.colorName === selectedColor) || popupVariants[0] || null;
 
-            <div className="w-full md:w-1/2 bg-[#F8FAFC] min-h-[300px] flex items-center justify-center p-8">
-              <img src={selectedProduct.image || "https://images.unsplash.com/photo-1608231387042-66d1773070a5?auto=format&fit=crop&q=80&w=600"} alt={selectedProduct.name} className="w-full h-auto object-contain mix-blend-multiply drop-shadow-2xl hover:scale-105 transition-transform duration-700" />
-            </div>
+        const generalImages: string[] = (selectedProduct.images && Array.isArray(selectedProduct.images) && selectedProduct.images.length > 0)
+          ? selectedProduct.images
+          : (selectedProduct.image ? [selectedProduct.image] : []);
 
-            <div className="w-full md:w-1/2 p-8 lg:p-10 flex flex-col bg-white">
-              <span className="bg-slate-100 text-slate-600 text-[10px] font-black px-2.5 py-1 rounded-md uppercase tracking-wider w-fit mb-4">{selectedProduct.category?.name || "Lam Điền"}</span>
-              <h2 className="text-2xl font-black text-slate-900 mb-3 leading-tight">{selectedProduct.name}</h2>
+        const displayImage = popupActiveImage
+          || generalImages[0]
+          || (activeVariant?.image)
+          || "https://images.unsplash.com/photo-1608231387042-66d1773070a5?auto=format&fit=crop&q=80&w=600";
 
-              {selectedProduct.discountPrice && selectedProduct.discountPrice > 0 ? (
-                <div className="flex items-end gap-3 mb-6">
-                  <span className="text-3xl font-black text-red-600 leading-none">{formatVND(selectedProduct.discountPrice)}</span>
-                  <span className="text-base text-slate-400 line-through font-bold">{formatVND(selectedProduct.price)}</span>
-                </div>
-              ) : (
-                <div className="text-3xl font-black text-slate-900 mb-6 leading-none">{formatVND(selectedProduct.price)}</div>
-              )}
+        const displayPrice = activeVariant?.price || selectedProduct.price;
+        const displayDiscount = activeVariant?.discountPrice || selectedProduct.discountPrice;
+        const displayStock = activeVariant?.stock ?? selectedProduct.stock;
+        const variantTotalStock = displayStock;
+        const hasDiscount = displayDiscount && displayDiscount > 0;
 
-              <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap mb-6 bg-slate-50 p-5 rounded-2xl border-none">
-                {selectedProduct.description || "Chưa có mô tả chi tiết."}
-              </p>
+        // Tồn kho cụ thể của size đang chọn
+        const activeSizeStock = (activeVariant?.sizeStocks && popupSize && activeVariant.sizeStocks[popupSize] !== undefined)
+          ? Number(activeVariant.sizeStocks[popupSize])
+          : variantTotalStock;
 
-              {/* Reviews Section */}
-              <div className="mb-6">
-                <h3 className="font-bold text-slate-800 text-sm mb-3">Đánh giá sản phẩm ({selectedProduct.reviews?.length || 0})</h3>
-                <div className="space-y-3 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
-                  {selectedProduct.reviews && selectedProduct.reviews.length > 0 ? (
-                    selectedProduct.reviews.map((rev: any) => (
-                      <div key={rev.id} className="bg-slate-50 p-3 rounded-xl">
-                        <div className="flex justify-between items-center mb-1.5">
-                          <span className="font-bold text-xs text-slate-800">{rev.user?.name || "Người dùng ẩn danh"}</span>
-                          <div className="flex gap-0.5">
-                            {[1, 2, 3, 4, 5].map(star => (
-                              <Star key={star} className={`w-3 h-3 ${rev.rating >= star ? 'fill-amber-400 text-amber-400' : 'text-slate-200'}`} />
-                            ))}
+        return (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
+            <div className="bg-white rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-y-auto flex flex-col md:flex-row shadow-2xl relative">
+              <button onClick={() => { setSelectedProduct(null); setPopupSize(""); }} className="absolute top-4 right-4 p-2 bg-slate-100 hover:bg-slate-200 rounded-lg z-10 transition-colors"><X className="w-5 h-5 text-slate-600" /></button>
+
+              <div className="w-full md:w-1/2 bg-[#F8FAFC] min-h-[300px] flex items-center justify-center p-8">
+                <img src={selectedProduct.image || "https://images.unsplash.com/photo-1608231387042-66d1773070a5?auto=format&fit=crop&q=80&w=600"} alt={selectedProduct.name} className="w-full h-auto object-contain mix-blend-multiply drop-shadow-2xl hover:scale-105 transition-transform duration-700" />
+              </div>
+
+              <div className="w-full md:w-1/2 p-8 lg:p-10 flex flex-col bg-white">
+                <span className="bg-slate-100 text-slate-600 text-[10px] font-black px-2.5 py-1 rounded-md uppercase tracking-wider w-fit mb-4">{selectedProduct.category?.name || "Lam Điền"}</span>
+                <h2 className="text-2xl font-black text-slate-900 mb-3 leading-tight">{selectedProduct.name}</h2>
+
+                {selectedProduct.discountPrice && selectedProduct.discountPrice > 0 ? (
+                  <div className="flex items-end gap-3 mb-6">
+                    <span className="text-3xl font-black text-red-600 leading-none">{formatVND(selectedProduct.discountPrice)}</span>
+                    <span className="text-base text-slate-400 line-through font-bold">{formatVND(selectedProduct.price)}</span>
+                  </div>
+                ) : (
+                  <div className="text-3xl font-black text-slate-900 mb-5 leading-none">{formatVND(displayPrice)}</div>
+                )}
+
+                {/* CHỌN MÀU SẮC */}
+                {popupVariants.length > 0 && (
+                  <div className="mb-5">
+                    <span className="font-bold text-slate-800 text-xs uppercase tracking-wider block mb-3">
+                      Màu sắc: <span className="text-teal-700 normal-case font-black">{selectedColor || popupVariants[0]?.colorName}</span>
+                      <span className="text-slate-400 font-medium ml-2 text-[11px]">
+                        (Còn {displayStock} sản phẩm)
+                      </span>
+                    </span>
+                    <div className="flex flex-wrap gap-2.5">
+                      {popupVariants.map((v: any, i: number) => {
+                        const isActive = (selectedColor === v.colorName) || (!selectedColor && i === 0);
+                        const isOutOfStock = v.stock === 0;
+                        return (
+                          <button
+                            key={i}
+                            onClick={() => handleSelectColorInPopup(selectedProduct, v.colorName)}
+                            disabled={isOutOfStock}
+                            className={`relative flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold border-2 transition-all ${isActive
+                                ? 'border-teal-600 bg-teal-50 text-teal-800 shadow-md ring-1 ring-teal-500/30'
+                                : isOutOfStock
+                                  ? 'border-slate-100 bg-slate-50 text-slate-300 cursor-not-allowed'
+                                  : 'border-slate-200 bg-white text-slate-700 hover:border-teal-300 hover:bg-teal-50/50'
+                              }`}
+                            title={isOutOfStock ? `${v.colorName} - Hết hàng` : `${v.colorName} - Còn ${v.stock} SP`}
+                          >
+                            <div
+                              className={`w-5 h-5 rounded-full border ${isActive ? 'ring-2 ring-teal-500 ring-offset-1' : 'border-slate-300'}`}
+                              style={{ backgroundColor: v.colorCode || '#ccc' }}
+                            />
+                            <span>{v.colorName}</span>
+                            {isOutOfStock ? (
+                              <span className="text-[9px] text-red-400 font-bold ml-0.5">Hết</span>
+                            ) : (
+                              <span className="text-[10px] text-slate-400 font-medium ml-0.5">{v.stock}</span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap mb-5 bg-slate-50 p-5 rounded-2xl border-none">
+                  {selectedProduct.description || "Chưa có mô tả chi tiết."}
+                </p>
+
+                {/* Reviews Section */}
+                <div className="mb-6">
+                  <h3 className="font-bold text-slate-800 text-sm mb-3">Đánh giá sản phẩm ({selectedProduct.reviews?.length || 0})</h3>
+                  <div className="space-y-3 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
+                    {selectedProduct.reviews && selectedProduct.reviews.length > 0 ? (
+                      selectedProduct.reviews.map((rev: any) => (
+                        <div key={rev.id} className="bg-slate-50 p-3 rounded-xl">
+                          <div className="flex justify-between items-center mb-1.5">
+                            <span className="font-bold text-xs text-slate-800">{rev.user?.name || "Người dùng ẩn danh"}</span>
+                            <div className="flex gap-0.5">
+                              {[1, 2, 3, 4, 5].map(star => (
+                                <Star key={star} className={`w-3 h-3 ${rev.rating >= star ? 'fill-amber-400 text-amber-400' : 'text-slate-200'}`} />
+                              ))}
+                            </div>
                           </div>
+                          <p className="text-xs text-slate-600">{rev.comment}</p>
                         </div>
-                        <p className="text-xs text-slate-600">{rev.comment}</p>
-                      </div>
-                    ))
-                  ) : (
-                    <p className="text-xs text-slate-500 italic">Chưa có đánh giá nào.</p>
-                  )}
+                      ))
+                    ) : (
+                      <p className="text-xs text-slate-500 italic">Chưa có đánh giá nào.</p>
+                    )}
+                  </div>
                 </div>
-              </div>
 
-              <div className="mb-6">
-                <div className="flex justify-between items-center mb-4">
-                  <span className="font-bold text-slate-800 text-xs uppercase tracking-wider">Chọn Size</span>
-                  <span onClick={() => setIsSizeGuideOpen(true)} className="flex items-center gap-1.5 text-xs text-teal-700 hover:text-teal-900 cursor-pointer font-bold"><Ruler className="w-3.5 h-3.5" /> Hướng dẫn chọn size</span>
+                <div className="mb-6">
+                  <div className="flex justify-between items-center mb-4">
+                    <span className="font-bold text-slate-800 text-xs uppercase tracking-wider">Chọn Size</span>
+                    <span onClick={() => setIsSizeGuideOpen(true)} className="flex items-center gap-1.5 text-xs text-teal-700 hover:text-teal-900 cursor-pointer font-bold"><Ruler className="w-3.5 h-3.5" /> Hướng dẫn chọn size</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2.5">
+                    {selectedProduct.sizes && selectedProduct.sizes.length > 0 ? (
+                      selectedProduct.sizes.map((s: string) => (
+                        <button key={s} onClick={() => setPopupSize(s)} className={`w-12 h-12 flex items-center justify-center rounded-xl text-sm font-bold border-none transition-all ${popupSize === s ? 'bg-slate-900 text-white shadow-md scale-105' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>{s}</button>
+                      ))
+                    ) : <span className="text-sm text-slate-500 italic font-medium">Freesize</span>}
+                  </div>
                 </div>
-                <div className="flex flex-wrap gap-2.5">
-                  {selectedProduct.sizes && selectedProduct.sizes.length > 0 ? (
-                    selectedProduct.sizes.map((s: string) => (
-                      <button key={s} onClick={() => setPopupSize(s)} className={`w-12 h-12 flex items-center justify-center rounded-xl text-sm font-bold border-none transition-all ${popupSize === s ? 'bg-slate-900 text-white shadow-md scale-105' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>{s}</button>
-                    ))
-                  ) : <span className="text-sm text-slate-500 italic font-medium">Freesize</span>}
-                </div>
-              </div>
 
-              <div className="mt-auto pt-6">
-                <div className="flex gap-3">
-                  <button disabled={selectedProduct.stock === 0} onClick={() => addToCart(selectedProduct, popupSize)} className="flex-1 bg-white hover:bg-slate-50 disabled:bg-slate-100 disabled:text-slate-300 text-teal-700 py-4 rounded-xl font-black uppercase text-sm tracking-widest border-2 border-teal-700 disabled:border-slate-200 active:scale-[0.98] transition-all">
-                    {selectedProduct.stock === 0 ? "Tạm hết hàng" : "Thêm giỏ hàng"}
-                  </button>
-                  <button disabled={selectedProduct.stock === 0} onClick={() => buyNow(selectedProduct, popupSize)} className="flex-1 bg-teal-700 hover:bg-teal-800 disabled:bg-slate-200 disabled:text-slate-400 text-white py-4 rounded-xl font-black uppercase text-sm tracking-widest shadow-lg shadow-teal-700/20 active:scale-[0.98] transition-all">
-                    {selectedProduct.stock === 0 ? "Tạm hết hàng" : "Mua ngay"}
-                  </button>
-                </div>
-                <div className="flex gap-6 mt-5 justify-center">
-                  <span className="flex items-center gap-1.5 text-xs text-slate-500 font-bold"><Check className="w-4 h-4 text-emerald-500" /> Sẵn {selectedProduct.stock} SP</span>
-                  <span className="flex items-center gap-1.5 text-xs text-slate-500 font-bold"><Truck className="w-4 h-4 text-teal-500" /> Freeship toàn quốc</span>
+                <div className="mt-auto pt-6">
+                  <div className="flex gap-3">
+                    <button disabled={selectedProduct.stock === 0} onClick={() => addToCart(selectedProduct, popupSize)} className="flex-1 bg-white hover:bg-slate-50 disabled:bg-slate-100 disabled:text-slate-300 text-teal-700 py-4 rounded-xl font-black uppercase text-sm tracking-widest border-2 border-teal-700 disabled:border-slate-200 active:scale-[0.98] transition-all">
+                      {selectedProduct.stock === 0 ? "Tạm hết hàng" : "Thêm giỏ hàng"}
+                    </button>
+                    <button disabled={selectedProduct.stock === 0} onClick={() => buyNow(selectedProduct, popupSize)} className="flex-1 bg-teal-700 hover:bg-teal-800 disabled:bg-slate-200 disabled:text-slate-400 text-white py-4 rounded-xl font-black uppercase text-sm tracking-widest shadow-lg shadow-teal-700/20 active:scale-[0.98] transition-all">
+                      {selectedProduct.stock === 0 ? "Tạm hết hàng" : "Mua ngay"}
+                    </button>
+                  </div>
+                  <div className="flex gap-6 mt-5 justify-center">
+                    <span className="flex items-center gap-1.5 text-xs text-slate-500 font-bold"><Check className="w-4 h-4 text-emerald-500" /> Sẵn {selectedProduct.stock} SP</span>
+                    <span className="flex items-center gap-1.5 text-xs text-slate-500 font-bold"><Truck className="w-4 h-4 text-teal-500" /> Freeship toàn quốc</span>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ==================== PANEL GIỎ HÀNG ==================== */}
       {isCartOpen && (
