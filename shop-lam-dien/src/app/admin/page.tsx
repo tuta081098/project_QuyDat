@@ -1310,6 +1310,8 @@ export default function AdminDashboardPage() {
             </form>
           </div>
         </div>
+      )}
+
       {/* MODAL XEM CHI TIẾT ĐƠN HÀNG */}
       {selectedOrderDetails && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
