@@ -3,3 +3,4 @@ tsconfig.tsbuildinfo
 package-lock.json
 .env
 package-lock.json
+public/uploads/.gitkeep
