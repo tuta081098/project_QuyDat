@@ -7,6 +7,7 @@ import {
   TrendingUp, Clock, AlertTriangle, ChevronRight, MessageSquare, Palette, MapPin, FileText,
   Flame, BarChart3, QrCode, Truck, RefreshCw, ArrowUpRight
 } from "lucide-react";
+import { formatVND, formatCurrencyInput, parseCurrency, numberToWordsVN } from "@/src/lib/format";
 
 const HEADER_TABS = ['NAM', 'NỮ', 'TRẺ EM', 'PHỤ KIỆN', 'BỘ SƯU TẬP', 'GIẢM GIÁ'];
 
@@ -102,8 +103,6 @@ export default function AdminDashboardPage() {
       setIsLoading(false);
     }
   };
-
-  const formatVND = (num: number) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(num);
 
   const updateOrderStatus = async (orderId: string, newStatus: string) => {
     try {
@@ -318,8 +317,8 @@ export default function AdminDashboardPage() {
         setColorVariants(prod.colorVariants.map((v: any) => ({
           colorName: v.colorName || "",
           colorCode: v.colorCode || "#000000",
-          price: String(v.price || ""),
-          discountPrice: v.discountPrice ? String(v.discountPrice) : "",
+          price: v.price ? formatCurrencyInput(v.price) : "",
+          discountPrice: v.discountPrice ? formatCurrencyInput(v.discountPrice) : "",
           stock: String(v.stock || ""),
           image: v.image || "",
           sizes: Array.isArray(v.sizes) ? v.sizes.join(', ') : (v.sizes || (prod.sizes ? prod.sizes.join(', ') : "")),
@@ -330,8 +329,8 @@ export default function AdminDashboardPage() {
         setColorVariants([{
           colorName: "Mặc định",
           colorCode: "#000000",
-          price: String(prod.price || ""),
-          discountPrice: prod.discountPrice ? String(prod.discountPrice) : "",
+          price: prod.price ? formatCurrencyInput(prod.price) : "",
+          discountPrice: prod.discountPrice ? formatCurrencyInput(prod.discountPrice) : "",
           stock: String(prod.stock || ""),
           image: "",
           sizes: prod.sizes ? prod.sizes.join(', ') : "",
@@ -477,7 +476,12 @@ export default function AdminDashboardPage() {
     // Validate biến thể
     for (const v of colorVariants) {
       if (!v.colorName.trim()) { showToast("Vui lòng nhập tên màu cho tất cả biến thể!", "error"); return; }
-      if (!v.price || Number(v.price) <= 0) { showToast(`Vui lòng nhập giá hợp lệ cho màu "${v.colorName}"!`, "error"); return; }
+      const parsedVPrice = parseCurrency(v.price);
+      const parsedVDiscount = v.discountPrice ? parseCurrency(v.discountPrice) : null;
+      if (parsedVPrice <= 0) { showToast(`Vui lòng nhập giá hợp lệ cho màu "${v.colorName}"!`, "error"); return; }
+      if (parsedVDiscount !== null && parsedVDiscount >= parsedVPrice) {
+        showToast(`Giá KM của màu "${v.colorName}" phải nhỏ hơn giá bán gốc!`, "error"); return;
+      }
       if (v.stock === "" || Number(v.stock) < 0) { showToast(`Vui lòng nhập số lượng hợp lệ cho màu "${v.colorName}"!`, "error"); return; }
     }
 
@@ -507,8 +511,8 @@ export default function AdminDashboardPage() {
         return {
           colorName: v.colorName.trim(),
           colorCode: v.colorCode,
-          price: Number(v.price),
-          discountPrice: v.discountPrice ? Number(v.discountPrice) : null,
+          price: parseCurrency(v.price),
+          discountPrice: v.discountPrice ? parseCurrency(v.discountPrice) : null,
           stock: variantTotalStock,
           image: v.image || "",
           sizes: variantSizes,
@@ -1756,24 +1760,67 @@ export default function AdminDashboardPage() {
                       {/* Row 2: Giá + Giá KM + Tồn kho */}
                       <div className="grid grid-cols-3 gap-3">
                         <div>
-                          <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Giá bán (VNĐ)</label>
-                          <input
-                            type="number"
-                            value={variant.price}
-                            onChange={(e) => updateVariant(idx, 'price', e.target.value)}
-                            placeholder="VD: 350000"
-                            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-bold outline-none focus:border-teal-500"
-                          />
+                          <div className="flex justify-between items-center mb-1">
+                            <label className="text-[10px] font-bold text-slate-500 uppercase">Giá bán (VNĐ)</label>
+                            {variant.price && parseCurrency(variant.price) > 0 && (
+                              <span className="text-[9px] font-black text-teal-800 bg-teal-50 px-1.5 py-0.5 rounded">
+                                {formatVND(parseCurrency(variant.price))}
+                              </span>
+                            )}
+                          </div>
+                          <div className="relative">
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              value={variant.price}
+                              onChange={(e) => updateVariant(idx, 'price', formatCurrencyInput(e.target.value))}
+                              placeholder="VD: 350.000"
+                              className="w-full pl-3 pr-7 py-2 border border-slate-200 rounded-lg text-sm font-bold outline-none focus:border-teal-500 transition-colors"
+                            />
+                            <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] font-black text-slate-400 pointer-events-none">
+                              ₫
+                            </span>
+                          </div>
+                          {variant.price && parseCurrency(variant.price) > 0 && (
+                            <p className="text-[9px] text-slate-400 italic mt-0.5 truncate">
+                              {numberToWordsVN(parseCurrency(variant.price))}
+                            </p>
+                          )}
                         </div>
                         <div>
-                          <label className="text-[10px] font-bold text-red-400 uppercase block mb-1">Giá KM (VNĐ)</label>
-                          <input
-                            type="number"
-                            value={variant.discountPrice}
-                            onChange={(e) => updateVariant(idx, 'discountPrice', e.target.value)}
-                            placeholder="Bỏ trống nếu không KM"
-                            className="w-full px-3 py-2 border border-red-100 rounded-lg text-sm font-bold text-red-600 outline-none focus:border-red-400"
-                          />
+                          <div className="flex justify-between items-center mb-1">
+                            <label className="text-[10px] font-bold text-red-500 uppercase">Giá KM (VNĐ)</label>
+                            {variant.discountPrice && parseCurrency(variant.discountPrice) > 0 && (
+                              <span className="text-[9px] font-black text-red-600 bg-red-50 px-1.5 py-0.5 rounded">
+                                {formatVND(parseCurrency(variant.discountPrice))}
+                              </span>
+                            )}
+                          </div>
+                          <div className="relative">
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              value={variant.discountPrice}
+                              onChange={(e) => updateVariant(idx, 'discountPrice', formatCurrencyInput(e.target.value))}
+                              placeholder="Bỏ trống nếu không KM"
+                              className="w-full pl-3 pr-7 py-2 border border-red-100 rounded-lg text-sm font-bold text-red-600 outline-none focus:border-red-400 transition-colors"
+                            />
+                            <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] font-black text-red-400 pointer-events-none">
+                              ₫
+                            </span>
+                          </div>
+                          {variant.discountPrice && parseCurrency(variant.discountPrice) > 0 ? (
+                            <div className="flex items-center justify-between mt-0.5">
+                              <p className="text-[9px] text-slate-400 italic truncate">
+                                {numberToWordsVN(parseCurrency(variant.discountPrice))}
+                              </p>
+                              {parseCurrency(variant.price) > 0 && parseCurrency(variant.discountPrice) < parseCurrency(variant.price) && (
+                                <span className="text-[9px] font-bold text-emerald-600 ml-1 shrink-0 bg-emerald-50 px-1 rounded">
+                                  Giảm {Math.round(((parseCurrency(variant.price) - parseCurrency(variant.discountPrice)) / parseCurrency(variant.price)) * 100)}%
+                                </span>
+                              )}
+                            </div>
+                          ) : null}
                         </div>
                         <div>
                           <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">

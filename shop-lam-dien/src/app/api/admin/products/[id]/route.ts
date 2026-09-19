@@ -8,14 +8,20 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const body = await request.json();
     const { name, slug, price, discountPrice, stock, categoryId, status, image, sizes, description } = body;
 
+    const numPrice = typeof price === 'number' ? Math.round(price) : Math.round(Number(String(price || '').replace(/\D/g, '')) || 0);
+    const numDiscount = (discountPrice !== null && discountPrice !== undefined && discountPrice !== '') 
+      ? (typeof discountPrice === 'number' ? Math.round(discountPrice) : Math.round(Number(String(discountPrice).replace(/\D/g, '')) || 0))
+      : null;
+    const numStock = typeof stock === 'number' ? Math.round(stock) : Math.round(Number(String(stock || '').replace(/\D/g, '')) || 0);
+
     const product = await prisma.product.update({
       where: { id },
       data: {
         name,
         slug,
-        price,
-        discountPrice,
-        stock,
+        price: numPrice,
+        discountPrice: numDiscount,
+        stock: numStock,
         categoryId,
         status,
         image,

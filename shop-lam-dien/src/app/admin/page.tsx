@@ -7,6 +7,7 @@ import {
   TrendingUp, Clock, AlertTriangle, ChevronRight, MessageSquare,
   Flame, BarChart3, QrCode, Truck, RefreshCw, ArrowUpRight, FileText
 } from "lucide-react";
+import { formatVND, formatCurrencyInput, parseCurrency, numberToWordsVN } from "@/src/lib/format";
 
 const HEADER_TABS = ['NAM', 'NỮ', 'TRẺ EM', 'PHỤ KIỆN', 'BỘ SƯU TẬP', 'GIẢM GIÁ'];
 
@@ -95,8 +96,6 @@ export default function AdminDashboardPage() {
       setIsLoading(false);
     }
   };
-
-  const formatVND = (num: number) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(num);
 
   const updateOrderStatus = async (orderId: string, newStatus: string) => {
     try {
@@ -252,8 +251,8 @@ export default function AdminDashboardPage() {
       setProdForm({
         name: prod.name,
         slug: prod.slug,
-        price: String(prod.price),
-        discountPrice: prod.discountPrice ? String(prod.discountPrice) : "",
+        price: prod.price ? formatCurrencyInput(prod.price) : "",
+        discountPrice: prod.discountPrice ? formatCurrencyInput(prod.discountPrice) : "",
         stock: String(prod.stock),
         categoryId: prod.categoryId,
         status: prod.status,
@@ -276,7 +275,14 @@ export default function AdminDashboardPage() {
     e.preventDefault();
     if (!prodForm.name.trim()) return showToast("Vui lòng nhập tên sản phẩm", "error");
     if (!prodForm.categoryId) return showToast("Vui lòng chọn danh mục", "error");
-    if (!prodForm.price || Number(prodForm.price) <= 0) return showToast("Vui lòng nhập giá bán hợp lệ (lớn hơn 0)", "error");
+
+    const parsedPrice = parseCurrency(prodForm.price);
+    const parsedDiscount = prodForm.discountPrice ? parseCurrency(prodForm.discountPrice) : null;
+
+    if (parsedPrice <= 0) return showToast("Vui lòng nhập giá bán hợp lệ (lớn hơn 0)", "error");
+    if (parsedDiscount !== null && parsedDiscount >= parsedPrice) {
+      return showToast("Giá khuyến mãi phải nhỏ hơn giá bán gốc!", "error");
+    }
     if (prodForm.stock === "" || Number(prodForm.stock) < 0) return showToast("Vui lòng nhập số lượng kho hợp lệ", "error");
     setIsSubmittingProd(true);
 
@@ -291,8 +297,8 @@ export default function AdminDashboardPage() {
         body: JSON.stringify({
           ...prodForm,
           sizes: sizesArray,
-          price: Number(prodForm.price),
-          discountPrice: prodForm.discountPrice ? Number(prodForm.discountPrice) : null,
+          price: parsedPrice,
+          discountPrice: parsedDiscount,
           stock: Number(prodForm.stock)
         })
       });
@@ -1276,13 +1282,79 @@ export default function AdminDashboardPage() {
               </div>
 
               <div className="mt-2">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Giá bán gốc (VND) <span className="text-red-500">*</span></label>
-                <input type="number" required value={prodForm.price} onChange={(e) => setProdForm({ ...prodForm, price: e.target.value })} className="w-full px-4 py-2.5 border border-slate-200 rounded-xl font-bold outline-none" />
+                <div className="flex justify-between items-center mb-1">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    Giá bán gốc <span className="text-red-500">*</span>
+                  </label>
+                  {prodForm.price && parseCurrency(prodForm.price) > 0 && (
+                    <span className="text-[11px] font-black text-teal-800 bg-teal-50 px-2 py-0.5 rounded-md">
+                      {formatVND(parseCurrency(prodForm.price))}
+                    </span>
+                  )}
+                </div>
+                <div className="relative">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    required
+                    placeholder="VD: 350.000"
+                    value={prodForm.price}
+                    onChange={(e) => {
+                      const formatted = formatCurrencyInput(e.target.value);
+                      setProdForm({ ...prodForm, price: formatted });
+                    }}
+                    className="w-full pl-4 pr-10 py-2.5 border border-slate-200 rounded-xl font-bold text-slate-800 outline-none focus:border-teal-500 transition-colors"
+                  />
+                  <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-black text-slate-400 pointer-events-none">
+                    ₫
+                  </span>
+                </div>
+                {prodForm.price && parseCurrency(prodForm.price) > 0 && (
+                  <p className="text-[10px] text-slate-400 italic mt-1 truncate">
+                    {numberToWordsVN(parseCurrency(prodForm.price))}
+                  </p>
+                )}
               </div>
 
               <div className="mt-2">
-                <label className="text-xs font-bold text-red-400 uppercase tracking-wider block mb-1">Giá Khuyến Mãi (VND)</label>
-                <input type="number" value={prodForm.discountPrice} onChange={(e) => setProdForm({ ...prodForm, discountPrice: e.target.value })} placeholder="Để trống nếu không Sale" className="w-full px-4 py-2.5 border border-red-200 rounded-xl font-bold text-red-600 outline-none focus:border-red-400 focus:bg-red-50/30 transition-colors" />
+                <div className="flex justify-between items-center mb-1">
+                  <label className="text-xs font-bold text-red-500 uppercase tracking-wider">
+                    Giá Khuyến Mãi
+                  </label>
+                  {prodForm.discountPrice && parseCurrency(prodForm.discountPrice) > 0 && (
+                    <span className="text-[11px] font-black text-red-600 bg-red-50 px-2 py-0.5 rounded-md">
+                      {formatVND(parseCurrency(prodForm.discountPrice))}
+                    </span>
+                  )}
+                </div>
+                <div className="relative">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="Để trống nếu không Sale"
+                    value={prodForm.discountPrice}
+                    onChange={(e) => {
+                      const formatted = formatCurrencyInput(e.target.value);
+                      setProdForm({ ...prodForm, discountPrice: formatted });
+                    }}
+                    className="w-full pl-4 pr-10 py-2.5 border border-red-200 rounded-xl font-bold text-red-600 outline-none focus:border-red-400 focus:bg-red-50/30 transition-colors"
+                  />
+                  <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-black text-red-400 pointer-events-none">
+                    ₫
+                  </span>
+                </div>
+                {prodForm.discountPrice && parseCurrency(prodForm.discountPrice) > 0 ? (
+                  <div className="flex items-center justify-between mt-1">
+                    <p className="text-[10px] text-slate-400 italic truncate">
+                      {numberToWordsVN(parseCurrency(prodForm.discountPrice))}
+                    </p>
+                    {parseCurrency(prodForm.price) > 0 && parseCurrency(prodForm.discountPrice) < parseCurrency(prodForm.price) && (
+                      <span className="text-[10px] font-bold text-emerald-600 ml-1 shrink-0 bg-emerald-50 px-1.5 py-0.5 rounded">
+                        Giảm {Math.round(((parseCurrency(prodForm.price) - parseCurrency(prodForm.discountPrice)) / parseCurrency(prodForm.price)) * 100)}%
+                      </span>
+                    )}
+                  </div>
+                ) : null}
               </div>
 
               <div className="mt-2 col-span-2">

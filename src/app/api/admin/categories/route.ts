@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/src/lib/prisma';
 
+const generateSlug = (text: string) => {
+  return text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+};
+
 export async function GET() {
   try {
     const categories = await prisma.category.findMany({
@@ -42,8 +46,9 @@ export async function POST(request: Request) {
          parentCategory = await prisma.category.create({
            data: { 
              name: headerTab, 
-             slug: headerTab.toLowerCase().replace(/ /g, '-'), 
-             isHeaderMenu: true 
+             slug: generateSlug(headerTab), 
+             isHeaderMenu: true,
+             status: 'ACTIVE'
            }
          });
       }
