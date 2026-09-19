@@ -1549,7 +1549,7 @@ export default function AdminDashboardPage() {
               <div className="bg-gradient-to-r from-teal-50 to-emerald-50 p-4 rounded-2xl flex justify-between items-center border border-teal-100">
                 <div>
                   <span className="text-xs font-bold text-teal-900 uppercase tracking-wider block">Tổng giá trị đơn hàng</span>
-                  <span className="text-[11px] text-teal-600">Đã bao gồm VAT & Miễn phí vận chuyển</span>
+                  <span className="text-[11px] text-teal-600">Đã bao gồm VAT & miễn phí vận chuyển</span>
                 </div>
                 <span className="text-2xl font-black text-teal-800">{formatVND(selectedOrderDetails.totalAmount)}</span>
               </div>
