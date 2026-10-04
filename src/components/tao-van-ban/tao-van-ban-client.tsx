@@ -281,6 +281,15 @@ export default function TaoVanBanClient() {
     return result.trim() || `Sheet_${index + 1}`;
   };
 
+  // "10.900" → 10900, "5,5" → 5.5. Trả null nếu không phải số, số 0 đầu hoặc >11 chữ số (SĐT, CCCD) để giữ nguyên dạng chữ.
+  const parseVnNumber = (s: string): number | null => {
+    const t = s.trim();
+    const vn = /^-?(?:[1-9]\d{0,2}(?:\.\d{3})+|0|[1-9]\d*)(?:,\d+)?$/.test(t);
+    const dec = /^-?(?:0|[1-9]\d*)\.(?:\d{1,2}|\d{4,})$/.test(t);
+    if ((!vn && !dec) || t.replace(/\D/g, "").length > 11) return null;
+    return Number(vn ? t.replace(/\./g, "").replace(",", ".") : t);
+  };
+
   const escapeXml = (unsafeStr: string) => {
     return unsafeStr.replace(/[<>&'"]/g, (c) => {
       switch (c) {
@@ -339,6 +348,14 @@ export default function TaoVanBanClient() {
         let templateSheetNode = sheetsNode!.querySelector("sheet");
         let templateRId = templateSheetNode!.getAttribute("r:id");
 
+        // Buộc Excel tính lại toàn bộ công thức khi mở file kết xuất
+        let calcPr = wbDoc.querySelector("calcPr");
+        if (!calcPr) {
+          calcPr = wbDoc.createElementNS(wbDoc.documentElement.namespaceURI, "calcPr");
+          ["definedNames", "externalReferences", "functionGroups", "sheets"].map(n => wbDoc.querySelector(n)).find(Boolean)!.after(calcPr);
+        }
+        calcPr.setAttribute("fullCalcOnLoad", "1");
+
         let relsXmlStr = await templateZip.file("xl/_rels/workbook.xml.rels")!.async("string");
         let relsDoc = parser.parseFromString(relsXmlStr, "application/xml");
         let relNode = relsDoc.querySelector(`Relationship[Id="${templateRId}"]`);
@@ -375,6 +392,12 @@ export default function TaoVanBanClient() {
           let newSheetDoc = parser.parseFromString(sheetXmlStr, "application/xml");
           let cNodes = newSheetDoc.querySelectorAll("c");
           cNodes.forEach(cNode => {
+            // Ô công thức: giữ <f>, bỏ giá trị cache cũ (VD #VALUE! do còn {placeholder}) để Excel tính lại
+            if (cNode.querySelector("f")) {
+              cNode.querySelector("v")?.remove();
+              cNode.removeAttribute("t");
+              return;
+            }
             let tAttr = cNode.getAttribute("t");
             let vNode = cNode.querySelector("v");
             if (vNode) {
@@ -396,9 +419,17 @@ export default function TaoVanBanClient() {
                   return row[cleanKey] !== undefined && row[cleanKey] !== null ? String(row[cleanKey]) : "";
                 });
 
+                // Ô chỉ chứa 1 {placeholder} ra số → ghi dạng số để công thức tham chiếu tính đúng
+                const num = /^\{[^}]+\}$/.test(originalText.trim()) ? parseVnNumber(newText) : null;
+                if (num !== null) {
+                  cNode.removeAttribute("t");
+                  vNode.textContent = String(num);
+                  return;
+                }
+
                 cNode.setAttribute("t", "inlineStr");
                 cNode.removeChild(vNode);
-                
+
                 let oldIs = cNode.querySelector("is");
                 if (oldIs) cNode.removeChild(oldIs);
 
