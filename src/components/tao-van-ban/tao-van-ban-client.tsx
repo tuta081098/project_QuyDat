@@ -466,6 +466,11 @@ export default function TaoVanBanClient() {
         templateSheetNode!.remove();
         templateZip.remove(`xl/${sheetPath}`);
 
+        // calcChain cũ trỏ tới sheet mẫu đã xoá → Excel báo lỗi file; bỏ đi, Excel tự dựng lại
+        templateZip.remove("xl/calcChain.xml");
+        relsDoc.querySelector('Relationship[Target$="calcChain.xml"]')?.remove();
+        ctDoc.querySelector('Override[PartName="/xl/calcChain.xml"]')?.remove();
+
         templateZip.file("xl/workbook.xml", serializer.serializeToString(wbDoc));
         templateZip.file("xl/_rels/workbook.xml.rels", serializer.serializeToString(relsDoc));
         templateZip.file("[Content_Types].xml", serializer.serializeToString(ctDoc));
