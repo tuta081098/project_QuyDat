@@ -242,7 +242,8 @@ export default function TaoVanBanClient() {
               // Có hỗ trợ các ký tự % hoặc tiền tệ đi kèm ($ VND VNĐ đ d €)
               const isUSNumber = /^[-+]?(?:\d{1,3}(?:,\d{3})*|\d+)(?:\.\d+)?\s*(?:%|VND|VNĐ|đ|d|\$|€)?$/i.test(trimmed);
               
-              if (isUSNumber && (trimmed.includes(',') || trimmed.includes('.'))) {
+              // Chỉ tráo khi có dấu phẩy; giá trị chỉ có dấu chấm (VD: 10.900) giữ nguyên.
+              if (isUSNumber && trimmed.includes(',')) {
                 // Thuật toán tráo đổi an toàn: Biến , thành biến tạm (TMP), biến . thành , rồi biến TMP thành .
                 val = trimmed.replace(/,/g, 'TMP').replace(/\./g, ',').replace(/TMP/g, '.');
               }
