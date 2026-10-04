@@ -242,10 +242,9 @@ export default function TaoVanBanClient() {
               // Có hỗ trợ các ký tự % hoặc tiền tệ đi kèm ($ VND VNĐ đ d €)
               const isUSNumber = /^[-+]?(?:\d{1,3}(?:,\d{3})*|\d+)(?:\.\d+)?\s*(?:%|VND|VNĐ|đ|d|\$|€)?$/i.test(trimmed);
               
-              // Chỉ tráo khi có dấu phẩy; giá trị chỉ có dấu chấm (VD: 10.900) giữ nguyên.
-              if (isUSNumber && trimmed.includes(',')) {
-                // Thuật toán tráo đổi an toàn: Biến , thành biến tạm (TMP), biến . thành , rồi biến TMP thành .
-                val = trimmed.replace(/,/g, 'TMP').replace(/\./g, ',').replace(/TMP/g, '.');
+              // Giá trị đã có dấu chấm (VD: 10.900, 1,234.56) giữ nguyên; chỉ đổi dấu phẩy ngăn cách nghìn (4,054,800) thành dấu chấm.
+              if (isUSNumber && trimmed.includes(',') && !trimmed.includes('.')) {
+                val = trimmed.replace(/,/g, '.');
               }
             }
             fixedRowObj[key] = val;
@@ -281,14 +280,9 @@ export default function TaoVanBanClient() {
     return result.trim() || `Sheet_${index + 1}`;
   };
 
-  // "10.900" → 10900, "5,5" → 5.5. Trả null nếu không phải số, số 0 đầu hoặc >11 chữ số (SĐT, CCCD) để giữ nguyên dạng chữ.
-  const parseVnNumber = (s: string): number | null => {
-    const t = s.trim();
-    const vn = /^-?(?:[1-9]\d{0,2}(?:\.\d{3})+|0|[1-9]\d*)(?:,\d+)?$/.test(t);
-    const dec = /^-?(?:0|[1-9]\d*)\.(?:\d{1,2}|\d{4,})$/.test(t);
-    if ((!vn && !dec) || t.replace(/\D/g, "").length > 11) return null;
-    return Number(vn ? t.replace(/\./g, "").replace(",", ".") : t);
-  };
+  // Chỉ chuỗi toàn chữ số (không 0 đầu, ≤11 chữ số) mới ghi thành số. Giá trị có dấu chấm/phẩy, SĐT, CCCD giữ nguyên dạng chữ để không đổi cách hiển thị.
+  const parsePlainInt = (s: string): number | null =>
+    /^-?(?:0|[1-9]\d{0,10})$/.test(s.trim()) ? Number(s) : null;
 
   const escapeXml = (unsafeStr: string) => {
     return unsafeStr.replace(/[<>&'"]/g, (c) => {
@@ -420,7 +414,7 @@ export default function TaoVanBanClient() {
                 });
 
                 // Ô chỉ chứa 1 {placeholder} ra số → ghi dạng số để công thức tham chiếu tính đúng
-                const num = /^\{[^}]+\}$/.test(originalText.trim()) ? parseVnNumber(newText) : null;
+                const num = /^\{[^}]+\}$/.test(originalText.trim()) ? parsePlainInt(newText) : null;
                 if (num !== null) {
                   cNode.removeAttribute("t");
                   vNode.textContent = String(num);
